@@ -5,7 +5,7 @@ try:
 except ImportError:
     pass
 
-from .experiment import Experiment
+from .experiment import Experiment, ExperimentError
 from .measurement import Measurement
 from .serialization import XMLArchive, XMLArchiveError, Serializer, SerializerError, Restorer
 from .config import Config

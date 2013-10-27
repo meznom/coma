@@ -2,7 +2,26 @@ import unittest
 from collections import OrderedDict
 import os
 import shutil
-from coma import Measurement, Experiment, Config, IndexFile
+import copy
+from coma import Measurement, Experiment, ExperimentError, Config, IndexFile
+
+_EXP_FILE_1='''\
+<experiment>
+  <info>
+    <experiment_id>10</experiment_id>
+    <description>Muh</description>
+  </info>
+</experiment>
+'''
+
+_EXP_FILE_2='''\
+<experiment>
+  <info>
+    <experiment_id>20</experiment_id>
+    <description>Miau</description>
+  </info>
+</experiment>
+'''
 
 class ExampleSimulation(object):
     def __init__(self):
@@ -28,6 +47,20 @@ class ExampleSimulation(object):
             ])
         return i
 
+def run_example_experiment(e, r=(0,10)):
+    e.start()
+    s = ExampleSimulation()
+    for i in range(*r):
+        m = e.new_measurement()
+        m.start()
+        s.a = i
+        s.init()
+        s.run()
+        m.end()
+        m.save(s)
+    e.end()
+    e.save()
+
 class TestExperiment(unittest.TestCase):
     def setUp(self):
         base_dir = os.path.dirname(__file__)
@@ -40,293 +73,285 @@ class TestExperiment(unittest.TestCase):
         os.mkdir(self.d)
         i = IndexFile(self.fi, 'experiment')
         i.createfile()
+        i.increment()
+        i.increment()
 
         self.c = Config()
         self.c.experiment_index = self.fi
 
-    # def tearDown(self):
-    #     if os.path.exists(self.d):
-    #         shutil.rmtree(self.d)
+    def tearDown(self):
+        if os.path.exists(self.d):
+            shutil.rmtree(self.d)
 
-    def test_create_experiment(self):
+    def test_create_experiment_with_id_in_name(self):
+        # create a new experiment
+        e = Experiment(self.d, description='Blub', config=self.c)
+        
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000003.xml')))
+        self.assertEquals(e.id, 3)
+        self.assertEquals(e.description, 'Blub')
+
+        # reopen the same experiment
         e = Experiment(self.d, config=self.c)
-        print(e.file)
 
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000003.xml')))
+        self.assertEquals(e.id, 3)
+        self.assertEquals(e.description, 'Blub')
 
-###    def setUp(self):
-###        base_dir = os.path.dirname(__file__)
-###        self.f = os.path.join(base_dir, 'testmeasurement.xml')
-###        self.d = os.path.join(base_dir, 'testexperiment')
-###        self.ed = os.path.join(base_dir, 'testexperimentsdirectory')
-###
-###        if os.path.exists(self.f):
-###            os.remove(self.f)
-###        if os.path.exists(self.d):
-###            shutil.rmtree(self.d)
-###        if os.path.exists(self.ed):
-###            shutil.rmtree(self.ed)
-###
-###    def tearDown(self):
-###        if os.path.exists(self.f):
-###            os.remove(self.f)
-###        if os.path.exists(self.d):
-###            shutil.rmtree(self.d)
-###        if os.path.exists(self.ed):
-###            shutil.rmtree(self.ed)
-###    
-###    def test_standalone_measurement(self):
-###        m = Measurement(self.f)
-###        s = ExampleSimulation()
-###        
-###        m.start()
-###        s.init()
-###        s.run()
-###        m.end()
-###        m.save(s)
-###
-###        self.assertEqual(m['info/measurement_id'], None)
-###        self.assertEqual(m['info/program'], 'ExampleSimulation')
-###        self.assertEqual(m['info/version'], 0.1)
-###        self.assertEqual(m['parameters/a'], 1)
-###        self.assertEqual(m['parameters/b'], 2)
-###        self.assertEqual(m['results/energies'], [1,2,3,4])
-###
-###        del(m)
-###        m = Measurement(self.f)
-###        self.assertEqual(m['info/measurement_id'], None)
-###        self.assertEqual(m['info/program'], 'ExampleSimulation')
-###        self.assertEqual(m['info/version'], 0.1)
-###        self.assertEqual(m['parameters/a'], 1)
-###        self.assertEqual(m['parameters/b'], 2)
-###        self.assertEqual(m['results/energies'], [1,2,3,4])
-###
-###    def test_standalone_experiment(self):
-###        e = Experiment(self.d)
-###        
-###        self.assertTrue(os.path.exists(self.d))
-###        self.assertTrue(os.path.exists(os.path.join(self.d, 'measurements.index.xml')))
-###        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.readme.xml')))
-###
-###        e.description = 'Test experiment'
-###
-###        e.start()
-###        s = ExampleSimulation()
-###
-###        for i in range(10):
-###            m = e.new_measurement()
-###            m.start()
-###            s.a = i
-###            s.init()
-###            s.run()
-###            m.end()
-###            m.save(s)
-###
-###        e.end()
-###        e.save()
-###
-###        del(e)
-###        e = Experiment(self.d)
-###        self.assertEqual(e['info/experiment_id'], None)
-###        self.assertEqual(e['info/description'], 'Test experiment')
-###        self.assertEqual(len(e.measurements), 10)
-###        for i in range(1,11):
-###            self.assertEqual(e['measurements'][i]['info/measurement_id'], i)
-###            self.assertEqual(e['measurements'][i]['info/program'], 'ExampleSimulation')
-###            self.assertEqual(e['measurements'][i]['parameters/a'], i-1)
-###
-###    def test_experiment_constructor(self):
-###        e = Experiment(self.d, 1,
-###                       description='A test experiment',
-###                       tags=['test','experiment'])
-###        del(e)
-###        e = Experiment(self.d)
-###        self.assertEqual(e['info/experiment_id'], 1)
-###        self.assertEqual(e['info/description'], 'A test experiment')
-###        self.assertEqual(e['info/tags'], ['test','experiment'])
-###
-###    def test_resetting_experiment(self):
-###        e = Experiment(self.d)
-###        e.start()
-###        s = ExampleSimulation()
-###        for i in range(10):
-###            m = e.new_measurement()
-###            m.start()
-###            s.a = i
-###            s.init()
-###            s.run()
-###            m.end()
-###            m.save(s)
-###        e.end()
-###        e.save()
-###
-###        del(e)
-###        e = Experiment(self.d)
-###        self.assertEqual(len(e.measurements), 10)
-###        for i in range(1,11):
-###            self.assertEqual(e['measurements'][i]['info/measurement_id'], i)
-###            self.assertEqual(e['measurements'][i]['info/program'], 'ExampleSimulation')
-###            self.assertEqual(e['measurements'][i]['parameters/a'], i-1)
-###        
-###        e = Experiment(self.d)
-###        e.reset()
-###        e.start()
-###        s = ExampleSimulation()
-###        for i in range(20,25):
-###            m = e.new_measurement()
-###            m.start()
-###            s.a = i
-###            s.init()
-###            s.run()
-###            m.end()
-###            m.save(s)
-###        e.end()
-###        e.save()
-###
-###        del(e)
-###        e = Experiment(self.d)
-###        self.assertEqual(len(e.measurements), 5)
-###        for i in range(1,6):
-###            self.assertEqual(e['measurements'][i]['info/measurement_id'], i)
-###            self.assertEqual(e['measurements'][i]['info/program'], 'ExampleSimulation')
-###            self.assertEqual(e['measurements'][i]['parameters/a'], i+19)
-###
-###    def test_continuing_measurements_in_experiment(self):
-###        e = Experiment(self.d)
-###        e.start()
-###        s = ExampleSimulation()
-###        for i in range(10):
-###            m = e.new_measurement()
-###            m.start()
-###            s.a = i
-###            s.init()
-###            s.run()
-###            m.end()
-###            m.save(s)
-###        e.end()
-###        e.save()
-###
-###        self.assertEqual(len(e.measurements), 10)
-###        for i in range(1,11):
-###            self.assertEqual(e['measurements'][i]['info/measurement_id'], i)
-###            self.assertEqual(e['measurements'][i]['info/program'], 'ExampleSimulation')
-###            self.assertEqual(e['measurements'][i]['parameters/a'], i-1)
-###
-###        del(e)
-###        e = Experiment(self.d)
-###        self.assertEqual(len(e.measurements), 10)
-###        for i in range(1,11):
-###            self.assertEqual(e['measurements'][i]['info/measurement_id'], i)
-###            self.assertEqual(e['measurements'][i]['info/program'], 'ExampleSimulation')
-###            self.assertEqual(e['measurements'][i]['parameters/a'], i-1)
-###        
-###        e = Experiment(self.d)
-###        e.start()
-###        s = ExampleSimulation()
-###        for i in range(20,25):
-###            m = e.new_measurement()
-###            m.start()
-###            s.a = i
-###            s.init()
-###            s.run()
-###            m.end()
-###            m.save(s)
-###        e.end()
-###        e.save()
-###
-###        del(e)
-###        e = Experiment(self.d)
-###        self.assertEqual(len(e.measurements), 15)
-###        for i in range(1,11):
-###            self.assertEqual(e['measurements'][i]['info/measurement_id'], i)
-###            self.assertEqual(e['measurements'][i]['info/program'], 'ExampleSimulation')
-###            self.assertEqual(e['measurements'][i]['parameters/a'], i-1)
-###        for i in range(11,16):
-###            self.assertEqual(e['measurements'][i]['info/measurement_id'], i)
-###            self.assertEqual(e['measurements'][i]['info/program'], 'ExampleSimulation')
-###            self.assertEqual(e['measurements'][i]['parameters/a'], i+9)
-###
-###    def test_experiment_templates(self):
-###        template_dir = os.path.join(os.path.dirname(__file__), 'test_template')
-###        
-###        e = Experiment(self.d,
-###                       from_template=template_dir,
-###                       description='A test experiment',
-###                       experiment_id='101')
-###        self.assertTrue(os.path.exists(os.path.join(self.d,'runexperiment.py')))
-###        self.assertTrue(os.path.exists(os.path.join(self.d,'measurements.index.xml')))
-###        self.assertTrue(os.path.exists(os.path.join(self.d,'experiment.readme.xml')))
-###
-###        del(e)
-###        e = Experiment(self.d)
-###        self.assertEqual(e['info/experiment_id'], 101)
-###        self.assertEqual(e['info/description'], 'A test experiment')
-###        with self.assertRaises(KeyError):
-###            x = e['info/data']
-###
-###    def test_experiments_directory(self):
-###        ed = ExperimentsDirectory(self.ed)
-###
-###        self.assertTrue(os.path.exists(self.ed))
-###        self.assertTrue(os.path.exists(os.path.join(self.ed, 'experiments.index.xml')))
-###        self.assertTrue(os.path.exists(os.path.join(self.ed, 'templates')))
-###        self.assertTrue(os.path.exists(os.path.join(self.ed, 'templates', 'default')))
-###        self.assertTrue(os.path.exists(os.path.join(self.ed, 'templates', 'python')))
-###
-###        e1 = ed.new_experiment(description='Test 1', tags=['test'])
-###        e2 = ed.new_experiment(description='Test 2', tags=['test'])
-###        e3 = ed.new_experiment(description='Test 3', tags=['test'], from_template='python')
-###
-###        self.assertTrue(os.path.exists(os.path.join(self.ed, '000001')))
-###        self.assertTrue(os.path.exists(os.path.join(self.ed, '000002')))
-###        self.assertTrue(os.path.exists(os.path.join(self.ed, '000003')))
-###
-###        e2.start()
-###        s = ExampleSimulation()
-###
-###        for i in range(10):
-###            m = e2.new_measurement()
-###            m.start()
-###            s.a = i
-###            s.init()
-###            s.run()
-###            m.end()
-###            m.save(s)
-###
-###        e2.end()
-###        e2.save()
-###
-###        self.assertEqual(len(ed),3)
-###        self.assertEqual(ed['1/info/experiment_id'], 1)
-###        self.assertEqual(ed['1/info/description'], 'Test 1')
-###        self.assertEqual(ed['1/info/tags'], ['test'])
-###        self.assertEqual(ed['2/info/experiment_id'], 2)
-###        self.assertEqual(ed['2/info/description'], 'Test 2')
-###        self.assertEqual(ed['2/info/tags'], ['test'])
-###        self.assertEqual(ed['3/info/experiment_id'], 3)
-###        self.assertEqual(ed['3/info/description'], 'Test 3')
-###        self.assertEqual(ed['3/info/tags'], ['test'])
-###        self.assertEqual(len(ed['1/measurements']), 0)
-###        self.assertEqual(len(ed['2/measurements']), 10)
-###        self.assertEqual(len(ed['3/measurements']), 0)
-###
-###        del(ed)
-###        ed = ExperimentsDirectory(self.ed)
-###        self.assertEqual(len(ed),3)
-###        self.assertEqual(ed['1/info/experiment_id'], 1)
-###        self.assertEqual(ed['1/info/description'], 'Test 1')
-###        self.assertEqual(ed['1/info/tags'], ['test'])
-###        self.assertEqual(ed['2/info/experiment_id'], 2)
-###        self.assertEqual(ed['2/info/description'], 'Test 2')
-###        self.assertEqual(ed['2/info/tags'], ['test'])
-###        self.assertEqual(ed['3/info/experiment_id'], 3)
-###        self.assertEqual(ed['3/info/description'], 'Test 3')
-###        self.assertEqual(ed['3/info/tags'], ['test'])
-###        self.assertEqual(len(ed['1/measurements']), 0)
-###        self.assertEqual(len(ed['2/measurements']), 10)
-###        self.assertEqual(len(ed['3/measurements']), 0)
-###
-###        e4 = ed.new_experiment(description='Test 4', tags=['test'])
-###        self.assertTrue(os.path.exists(os.path.join(self.ed, '000004')))
-###        self.assertEqual(ed['4/info/experiment_id'], 4)
-###        self.assertEqual(ed['4/info/description'], 'Test 4')
-###        self.assertEqual(ed['4/info/tags'], ['test'])
+    def test_create_experiment_without_id_in_name(self):
+        c = copy.copy(self.c)
+        c.experiment_file = 'experiment.xml'
+        
+        # create a new experiment
+        e = Experiment(self.d, description='Blub', config=c)
+        
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.xml')))
+        self.assertEquals(e.id, 3)
+        self.assertEquals(e.description, 'Blub')
+
+        # reopen the same experiment
+        e = Experiment(self.d, config=c)
+
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.xml')))
+        self.assertEquals(e.id, 3)
+        self.assertEquals(e.description, 'Blub')
+
+    def test_create_experiment_with_specific_id(self):
+        # create a new experiment
+        e = Experiment(self.d, id=42, description='Blub', config=self.c)
+        
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000042.xml')))
+        self.assertEquals(e.id, 42)
+        self.assertEquals(e.description, 'Blub')
+
+        # reopen the same experiment
+        e = Experiment(self.d, config=self.c)
+
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000042.xml')))
+        self.assertEquals(e.id, 42)
+        self.assertEquals(e.description, 'Blub')
+
+    def test_create_experiment_without_index_file(self):
+        c = copy.copy(self.c)
+        c.experiment_index = '__experimenttest.index.xml'
+        
+        e = Experiment(self.d,config=c)
+        self.assertFalse(os.path.exists(c.experiment_index_path))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.none.xml')))
+        self.assertEquals(e.id, None)
+
+        e = Experiment(self.d,id=42,config=c)
+        self.assertFalse(os.path.exists(c.experiment_index_path))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000042.xml')))
+        self.assertEquals(e.id, 42)
+
+    def test_load_experiment_with_id(self):
+        fn = os.path.join(self.d, 'experiment.000010.xml')
+        f = open(fn, 'w')
+        f.write(_EXP_FILE_1)
+        f.close()
+
+        e = Experiment(self.d, config=self.c)
+        self.assertEquals(e.id, 10)
+        self.assertEquals(e.description, 'Muh')
+
+    def test_load_experiment_without_id(self):
+        c = copy.copy(self.c)
+        c.experiment_file = 'experiment.xml'
+
+        fn = os.path.join(self.d, 'experiment.xml')
+        f = open(fn, 'w')
+        f.write(_EXP_FILE_1)
+        f.close()
+
+        e = Experiment(self.d, config=c)
+        self.assertEquals(e.id, 10)
+        self.assertEquals(e.description, 'Muh')
+
+    def test_load_experiment_with_wrong_id(self):
+        fn = os.path.join(self.d, 'experiment.000010.xml')
+        f = open(fn, 'w')
+        f.write(_EXP_FILE_2) # has id 20
+        f.close()
+        with self.assertRaises(ExperimentError):
+            e = Experiment(self.d, config=self.c)
+        os.remove(fn)
+        
+        fn = os.path.join(self.d, 'experiment.000020.xml')
+        f = open(fn, 'w')
+        f.write(_EXP_FILE_2)
+        f.close()
+        with self.assertRaises(ExperimentError):
+            e = Experiment(self.d, id=42, config=self.c)
+        os.remove(fn)
+
+        c = copy.copy(self.c)
+        c.experiment_file = 'experiment.xml'
+        fn = os.path.join(self.d, 'experiment.xml')
+        f = open(fn, 'w')
+        f.write(_EXP_FILE_2)
+        f.close()
+        with self.assertRaises(ExperimentError):
+            e = Experiment(self.d, id=42, config=c)
+        os.remove(fn)
+
+    def test_load_experiment_with_multiple_experiment_files_in_directory(self):
+        fn = os.path.join(self.d, 'experiment.000010.xml')
+        f = open(fn, 'w')
+        f.write(_EXP_FILE_1)
+        f.close()
+        fn = os.path.join(self.d, 'experiment.000020.xml')
+        f = open(fn, 'w')
+        f.write(_EXP_FILE_2)
+        f.close()
+
+        e = Experiment(self.d, id=20, config=self.c)
+        self.assertEquals(e.id, 20)
+        self.assertEquals(e.description, 'Miau')
+
+        with self.assertRaises(ExperimentError):
+            # TODO: maybe, in this case, we should better create a new
+            # experiment with id 42?
+            e = Experiment(self.d, id=42, config=self.c)
+        with self.assertRaises(ExperimentError):
+            e = Experiment(self.d, config=self.c)
+
+    def test_load_experiment_with_wrong_filename(self):
+        c = copy.copy(self.c)
+        c.experiment_file = 'experiment.xml'
+        fn = os.path.join(self.d, 'experiment.000010.xml')
+        f = open(fn, 'w')
+        f.write(_EXP_FILE_1)
+        f.close()
+
+        # creates a new experiment file
+        e = Experiment(self.d, config=c)
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.xml')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000010.xml')))
+    
+    def test_standalone_experiment(self):
+        e = Experiment(self.d,config=self.c)
+        
+        self.assertTrue(os.path.exists(self.d))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'measurement.index.xml')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000003.xml')))
+
+        e.description = 'Test experiment'
+        run_example_experiment(e)
+
+        del(e)
+        e = Experiment(self.d,config=self.c)
+        self.assertEqual(e.id, 3)
+        self.assertEqual(e.description, 'Test experiment')
+        self.assertEqual(e.number_of_measurements(), 10)
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m['info/measurement_id'], i+1)
+            self.assertEqual(m['info/program'], 'ExampleSimulation')
+            self.assertEqual(m['parameters/a'], i)
+
+    def test_experiment_constructor(self):
+        e = Experiment(self.d, 1, config=self.c,
+                       description='A test experiment',
+                       tags=['test','experiment'])
+        del(e)
+        e = Experiment(self.d, config=self.c)
+        self.assertEqual(e.id, 1)
+        self.assertEqual(e.description, 'A test experiment')
+        self.assertEqual(e.tags, ['test','experiment'])
+
+    def test_resetting_experiment(self):
+        e = Experiment(self.d, config=self.c)
+        run_example_experiment(e)
+
+        del(e)
+        e = Experiment(self.d, config=self.c)
+        self.assertEqual(e.number_of_measurements(), 10)
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m['info/measurement_id'], i+1)
+            self.assertEqual(m['info/program'], 'ExampleSimulation')
+            self.assertEqual(m['parameters/a'], i)
+        
+        e = Experiment(self.d,config=self.c)
+        e.reset()
+        run_example_experiment(e, (20,25))
+        e.start()
+
+        del(e)
+        e = Experiment(self.d,config=self.c)
+        self.assertEqual(e.number_of_measurements(), 5)
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m['info/measurement_id'], i+1)
+            self.assertEqual(m['info/program'], 'ExampleSimulation')
+            self.assertEqual(m['parameters/a'], i+20)
+
+    def test_experiment_with_different_measurement_filename(self):
+        c = copy.copy(self.c)
+        c.measurement_file = '${measurement_id}.xml'
+        e = Experiment(self.d, config=c)
+        run_example_experiment(e)
+
+        self.assertTrue(os.path.exists(os.path.join(self.d, '000001.xml')))
+        self.assertEqual(e.number_of_measurements(), 10)
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m['parameters/a'], i)
+
+        # An invalid measurement_file name: the measurement_id is missing
+        # In this case, things can't and won't work properly.
+        c = copy.copy(self.c)
+        c.measurement_file = 'blah.xml'
+        e = Experiment(self.d, config=c)
+        run_example_experiment(e)
+
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'blah.xml')))
+        self.assertEqual(e.number_of_measurements(), 1)
+
+    def test_continuing_measurements_in_experiment(self):
+        e = Experiment(self.d,config=self.c)
+        run_example_experiment(e)
+
+        self.assertEqual(e.number_of_measurements(), 10)
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m['info/measurement_id'], i+1)
+            self.assertEqual(m['info/program'], 'ExampleSimulation')
+            self.assertEqual(m['parameters/a'], i)
+
+        del(e)
+        e = Experiment(self.d,config=self.c)
+        self.assertEqual(e.number_of_measurements(), 10)
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m['info/measurement_id'], i+1)
+            self.assertEqual(m['info/program'], 'ExampleSimulation')
+            self.assertEqual(m['parameters/a'], i)
+        
+        e = Experiment(self.d,config=self.c)
+        run_example_experiment(e, (20,25))
+
+        del(e)
+        e = Experiment(self.d,config=self.c)
+        self.assertEqual(e.number_of_measurements(), 15)
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m['info/measurement_id'], i+1)
+            self.assertEqual(m['info/program'], 'ExampleSimulation')
+            if i < 10:
+                self.assertEqual(m['parameters/a'], i)
+            else:
+                self.assertEqual(m['parameters/a'], i+10)
+
+    def test_experiment_with_missing_measurements(self):
+        e = Experiment(self.d,config=self.c)
+        run_example_experiment(e)
+
+        f1 = os.path.join(self.d, 'measurement.000001.xml')
+        f2 = os.path.join(self.d, 'measurement.000007.xml')
+        self.assertTrue(os.path.exists(f1))
+        self.assertTrue(os.path.exists(f2))
+        os.remove(f1)
+        os.remove(f2)
+
+        self.assertEqual(e.number_of_measurements(), 8)
+        ns = [1,2,3,4,5,7,8,9]
+        c = 0
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m['parameters/a'], ns[i])
+            c += 1
+        self.assertEqual(c,8)

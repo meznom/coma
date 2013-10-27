@@ -3,11 +3,10 @@ import os
 import re
 from string import Template
 from .serialization import XMLArchive
-from .path import access_data_by_path
-from .measurementsdirectory import MeasurementsDirectory
 from .util import current_date_as_string
 from .indexfile import IndexFile
 from .config import Config
+from .measurement import Measurement
 
 class ExperimentError(Exception):
     pass
@@ -21,14 +20,21 @@ class Experiment(object):
         self.tags = tags
         self.start_date = None
         self.end_date = None
-        self.data = {}
         self.config = config
-        self.index = IndexFile(self.config.experiment_index_path, 'experiment')
+        
+        self.eindex = None
+        if os.path.exists(self.config.experiment_index_path):
+            self.eindex = IndexFile(self.config.experiment_index_path, 'experiment')
 
         if not os.path.exists(self.dir):
             os.mkdir(self.dir)
 
-        self.measurements = MeasurementsDirectory(self.dir)
+        # Measurements
+        # index file is created if it does not exist
+        self.last_mid = 0
+        mindexfile = os.path.join(self.dir,self.config.measurement_index)
+        self.mindex = IndexFile(mindexfile, 'measurement')
+        self.last_mid = self.mindex.read()
 
         # Retrieve files matching the experiment_file config variable.
         #
@@ -41,36 +47,53 @@ class Experiment(object):
         #
         # If there are multiple matching files, then we load the one matching
         # the provided experiment id. 
-        fs = self._matching_files()
+        fs = self._matching_experiment_files()
         if len(fs) == 0:
-            if self.id is None:
-                self.id = self.index.increment()
+            if self.id is None and self.eindex is not None:
+                self.id = self.eindex.increment()
             self.file = os.path.join(self.dir,self._experiment_filename())
             self.save()
         elif len(fs) == 1:
             if self.id is None and fs[0][0] != 0:
                 self.id = fs[0][0]
-            self.file = fs[0][1]
+            self.file = os.path.join(self.dir, fs[0][1])
         elif len(fs) > 1:
             d = dict(fs)
             if self.id is None or not d.has_key(self.id):
                 raise ExperimentError('Found multiple experiment files, non of ' +
                                       'which match the provided experiment id')
-            self.file = d[self.id]
+            self.file = os.path.join(self.dir, d[self.id])
         self.load()
 
     def _experiment_filename(self):
-        idstr = '{:06d}'.format(self.id)
+        idstr = 'none'
+        if isinstance(self.id, int):
+            idstr = '{:06d}'.format(self.id)
         s = self.config.experiment_file
         s = Template(s)
         s = s.substitute(experiment_id=idstr)
         return s
+    
+    def _measurement_filename(self, mid):
+        idstr = 'none'
+        if isinstance(mid, int):
+            idstr = '{:06d}'.format(mid)
+        s = self.config.measurement_file
+        s = Template(s)
+        s = s.substitute(measurement_id=idstr)
+        return s
 
-    def _matching_files(self):
+    def _matching_experiment_files(self):
+        return self._matching_files(self.config.experiment_file, 'experiment_id')
+    
+    def _matching_measurement_files(self):
+        return self._matching_files(self.config.measurement_file, 'measurement_id')
+
+    def _matching_files(self, pattern, sub):
         # Build a regular expression from the experiment_file config variable
-        s = self.config.experiment_file
+        s = pattern
         s = s.replace('.','\.').replace('/','\/')
-        s = '^' +  Template(s).substitute(experiment_id = '(\d+)') + '$'
+        s = '^' +  Template(s).substitute({sub: '(\d+)'}) + '$'
         e = re.compile(s)
         
         # All files in current directory that match
@@ -79,7 +102,7 @@ class Experiment(object):
         for f in fs:
             m  = e.match(f)
             if m is not None:
-                if len(m.groups() > 0):
+                if len(m.groups()) > 0:
                     rs.append((int(m.group(1)),m.group(0)))
                 else:
                     rs.append((0,m.group(0)))
@@ -106,28 +129,24 @@ class Experiment(object):
         if os.path.exists(backupfile):
             os.remove(backupfile)
 
-        # measurements are not saved to the experiment xml file
-        self.data = i
-        self.data['measurements'] = self.measurements
-
     def load(self):
         f = open(self.file)
         a = XMLArchive('experiment')
-        self.data = a.load(f)
+        i = a.load(f)
+        i = i['info']
         f.close()
 
-        i = self.data['info']
         if self.id is not None and str(self.id) != str(i['experiment_id']):
             raise ExperimentError('Trying to load experiment "{}" from file "{}", '
                     'but this is experiment "{}"'
                     .format(i['experiment_id'], self.file, self.id))
         
         self.id = i['experiment_id']
-        for k in ['description','start_date','end_date']:
+        for k in ['description','start_date','end_date','tags']:
             if i.has_key(k):
                 self.__setattr__(k, i[k])
-        
-        self.data['measurements'] = self.measurements
+
+        self.last_mid = self.mindex.read()
 
     def start(self):
         self.start_date = current_date_as_string()
@@ -139,16 +158,31 @@ class Experiment(object):
         raise NotImplementedError()
 
     def reset(self):
-        self.measurements.reset()
+        self.mindex.createfile()
+        self.last_mid = self.mindex.read()
+        for _,f in self._matching_measurement_files():
+            f = os.path.join(self.dir, f)
+            os.remove(f)
 
     def new_measurement(self):
-        return self.measurements.new_measurement()
+        mid = self.mindex.increment()
+        f = self._measurement_filename(mid)
+        f = os.path.join(self.dir, f)
+        m = Measurement(f, mid)
+        self.last_mid = mid
+        return m
 
-    def __iter__(self):
-        return self.data.itervalues()
+    def measurements(self):
+        for mid in range(1,self.last_mid+1):
+            f = self._measurement_filename(mid)
+            f = os.path.join(self.dir, f)
+            if os.path.exists(f):
+                yield Measurement(f, mid)
+            else:
+                continue
 
-    def __getitem__(self, i):
-        return access_data_by_path(self.data,i)
+    def number_of_measurements(self):
+        return len(self._matching_measurement_files())
 
     def __str__(self):
         s = 'Experiment {}'.format(self.id)
@@ -158,5 +192,5 @@ class Experiment(object):
                 if k != 'experiment_id' and v:
                     s += '\n  {}: {}'.format(k,v)
         s += '\n  Fields: {}'.format(self.data.keys())
-        s += '\n  {} measurements\n'.format(len(self.measurements))
+        s += '\n  {} measurements\n'.format(len(self.number_of_measurements()))
         return s

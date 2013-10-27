@@ -1,6 +1,5 @@
 import os
 import ConfigParser
-from . import xdgbasedirectory as xdg
 
 _CONFIG_FILE='''\
 [coma]
@@ -16,6 +15,7 @@ class Config(object):
         self.configfile_path = ''
         self.experiment_index_path = ''
 
+        self._configdir_path = '~/.config/coma'
         self._experiment_index = ''
         self._configfile = ''
         
@@ -50,9 +50,10 @@ class Config(object):
     def _expand_filename(self, f):
         f = os.path.expanduser(f)
         if os.path.exists(f):
-            return os.path.abspath(f)
-        p = xdg.save_config_path('coma')
-        f = os.path.join(p, f)
+            f = os.path.abspath(f)
+        else:
+            p = os.path.expanduser(self._configdir_path)
+            f = os.path.join(p, f)
         return f
 
     def load(self, p=None):

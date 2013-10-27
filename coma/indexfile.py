@@ -4,7 +4,6 @@ from .serialization import XMLArchive
 class IndexFile(object):
     def __init__(self, indexfile, indextype):
         self.f = indexfile
-        self.i = 0
         self.archive = ''
         self.element = ''
         if indextype == 'experiment':
@@ -44,7 +43,7 @@ class IndexFile(object):
 
     def createfile(self):
         self.lock()
-        o = {self.element: self.i}
+        o = {self.element: 0}
         f = open(self.f, 'w')
         a = XMLArchive(self.archive)
         a.dump(o,f)

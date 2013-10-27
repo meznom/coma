@@ -4,13 +4,36 @@ from .serialization import XMLArchive, MemoryArchive
 from .path import access_data_by_path
 from .util import current_date_as_string
 
+# Works, but makes a copy of everything we access
+# class DictAsObject(dict):
+#     def __init__(self, *args, **kwargs):
+#         super(DictAsObject, self).__init__(*args, **kwargs)
+#         self.__dict__ = self
+# 
+#     def __getattribute__(self, name):
+#          a = super(DictAsObject, self).__getattribute__(name)
+#          if isinstance(a,dict):
+#              return DictAsObject(a)
+#          else:
+#              return a
+
+class DictAsObject(object):
+    def __init__(self, d):
+        self.__dict__ = d
+
+    def __getattribute__(self, name):
+         a = super(DictAsObject, self).__getattribute__(name)
+         if isinstance(a,dict):
+             return DictAsObject(a)
+         else:
+             return a
+
 class Measurement(object):
-    def __init__(self, filename, measurement_id=None):
-        self.file = filename
-        self.id = measurement_id
+    def __init__(self, file, id=None):
+        self.file = file
+        self.id = id
         self.start_date = None
         self.end_date = None
-        self.results = None
         self.data = {}
         if os.path.exists(self.file):
             self.load()
@@ -20,9 +43,6 @@ class Measurement(object):
 
     def end(self):
         self.end_date = current_date_as_string()
-
-    def set_results(self, r):
-        self.results = r
 
     def save(self, m):
         i = OrderedDict()
@@ -42,8 +62,6 @@ class Measurement(object):
         else:
             i.update(o['info'])
             o['info'] = i
-        if not o.has_key('results'):
-            o['results'] = self.results
 
         self.data = o
 
@@ -57,6 +75,14 @@ class Measurement(object):
         a = XMLArchive('measurement')
         self.data = a.load(f)
         f.close()
+
+        i = self.data['info']
+        if i.has_key('measurement_id'):
+            self.id = i['measurement_id']
+        ks = ['start_date', 'end_date']
+        for k in ks:
+            if i.has_key(k):
+                self.__setattr__(k, i[k])
 
     def __iter__(self):
         return self.data.itervalues()
@@ -74,3 +100,15 @@ class Measurement(object):
                     s += '\n  {}: {}'.format(k,i[k])
         s += '\n  Fields: {}\n'.format(self.data.keys())
         return s
+
+    # This is experimental, a convenience method for accessing the data
+    # dictionary like an object: E.g. m.data['parameters']['layout']['V1']
+    # should be accessible as m.parameters.layout.V1 (where m is an instance of
+    # Measurement)
+    def __getattr__(self, name):
+        if not self.data.has_key(name):
+            raise AttributeError()
+        if isinstance(self.data[name], dict):
+            return DictAsObject(self.data[name])
+        else:
+            return self.data[name]

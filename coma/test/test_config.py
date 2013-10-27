@@ -27,7 +27,6 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(c.experiment_index_path, 
                          os.path.expanduser('~/.config/coma/experiment.index.xml'))
         
-
     def test_expands_paths_correctly(self):
         f = open('__pref.conf', 'w')
         f.close()
