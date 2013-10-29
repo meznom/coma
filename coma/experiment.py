@@ -2,6 +2,7 @@ from collections import OrderedDict
 import os
 import re
 from string import Template
+import numpy as np
 from .serialization import XMLArchive
 from .util import current_date_as_string
 from .indexfile import IndexFile
@@ -11,19 +12,66 @@ from .measurement import Measurement
 class ExperimentError(Exception):
     pass
 
+class Result(object):
+    def __init__(self):
+        self.table = np.array([])
+        self.table_definition = OrderedDict()
+        self.table_columns = ()
+        self.parameters = ParameterSet(OrderedDict(),())
+        self.measurement_ids = []
+
+    def __repr__(self):
+        cols = ','.join(c for c in self.table_columns)
+        return 'Result((' + cols + '),' + repr(self.parameters) + ')'
+
+class ResultList(list):
+    def filter_results(self, f):
+        if len(f) != 2:
+            raise TypeError()
+        p,v = f
+        rs = ResultList()
+        for r in self:
+            if not r.parameters.has(p):
+                continue
+            if r.parameters.get(p) == v:
+                rs.append(r)
+        return rs
+
+    def __getslice__(self, i, j):
+        return ResultList(list.__getslice__(self, i, j))
+
+    def __getitem__(self, n):
+        if isinstance(n,tuple):
+            return self.filter_results(n)
+        i = list.__getitem__(self, n)
+        if isinstance(i,list):
+            return ResultList(i)
+        return i
+
 class ParameterSet(object):
     def __init__(self, definition, parameter_tuple):
         if len(definition) != len(parameter_tuple):
             raise ExperimentError('ParameterSet: Parameter set definition and '
                                   'provided parameters do not agree')
-        self.d = definition
+        self.definition = definition
         self.ps = parameter_tuple
-        self.names = {}
+        self.names = OrderedDict()
         for i,n in enumerate(definition.values()):
             self.names[n] = i
-        self.shortnames = {}
+        self.shortnames = OrderedDict()
         for i,n in enumerate(definition.keys()):
             self.shortnames[n] = i
+
+    def has(self, n):
+        return self.shortnames.has_key(n) or self.names.has_key(n)
+
+    def get(self, n):
+        if self.shortnames.has_key(n):
+            return self.ps[ self.shortnames[n] ]
+        elif self.names.has_key(n):
+            return self.ps[ self.names[n] ]
+        else:
+            raise ExperimentError('Parameter "{}" does not exist in this parameter set'.format(n))
 
     def __getattr__(self, n):
         if not self.shortnames.has_key(n):
@@ -36,6 +84,13 @@ class ParameterSet(object):
         if not self.names.has_key(n):
             raise IndexError()
         return self.ps[ self.names[n] ]
+
+    def __repr__(self):
+        s = '('
+        s += ','.join(['{}={}'.format(n,v) for n,v in 
+                       zip(self.shortnames.keys(), self.ps)])
+        s += ')'
+        return s
 
 class Experiment(object):
     def __init__(self, dir, id=None, description=None, tags=[], config=Config()):
@@ -190,6 +245,47 @@ class Experiment(object):
 
     def run_measurement(self, parameter_set):
         raise NotImplementedError()
+
+    def retrieve_results(self, table_definition, parameter_set_definition=()):
+        tdef = OrderedDict(table_definition)
+        pdef = OrderedDict(parameter_set_definition)
+        
+        ts = OrderedDict()
+        for m in self.measurements():
+            try:
+                p,t,c = [],[],[]
+                for name,path in pdef.iteritems():
+                    p.append(m[path])
+                p = tuple(p)
+                for name,path in tdef.iteritems():
+                    v = m[path]
+                    if isinstance(v,list):
+                        t.extend(v)
+                        c.extend([name + '_' + str(i+1) for i in range(len(v))])
+                    else:
+                        t.append(v)
+                        c.append(name)
+                c = tuple(c)
+                if not ts.has_key(p):
+                    ts[p] = (c,[],[])
+                if ts[p][0] != c:
+                    raise ExperimentError('Different number of columns in results '
+                                          'table for the same set of parameters')
+                ts[p][1].append(t)
+                ts[p][2].append(m.id)
+            except KeyError:
+                pass
+
+        rs = ResultList()
+        for p,(c,t,ids) in ts.iteritems():
+            r = Result()
+            r.parameters = ParameterSet(pdef,p)
+            r.table = np.array(t)
+            r.table_definition = tdef
+            r.table_columns = c
+            r.measurement_ids = ids
+            rs.append(r)
+        return rs
 
     def _get_existing_psets(self):
         ps = []

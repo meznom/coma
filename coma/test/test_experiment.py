@@ -3,7 +3,8 @@ from collections import OrderedDict
 import os
 import shutil
 import copy
-from coma import Measurement, Experiment, ExperimentError, Config, IndexFile, ParameterSet
+from coma import Measurement, Experiment, ExperimentError, Config, IndexFile, \
+                 ParameterSet, ResultList, Result
 
 _EXP_FILE_1='''\
 <experiment>
@@ -30,8 +31,9 @@ class ExampleSimulation(object):
         self.a = 1
         self.t = 2
         self.V1 = 100
+        self.N = None
         self.boa = 2.2
-        self.energies = [1,2,3,4]
+        self.results = OrderedDict()
 
     def init(self):
         pass
@@ -40,29 +42,17 @@ class ExampleSimulation(object):
         pass
 
     def __getstate__(self):
-        i = OrderedDict([
-            ('parameters', OrderedDict([
-                        ('a', self.a),
-                        ('t', self.t),
-                        ('layout', OrderedDict([('V1', self.V1),('boa', self.boa)]))])),
-            ('results', OrderedDict([
-                        ('energies', self.energies)]))
-            ])
+        i = OrderedDict()
+        i['parameters'] = OrderedDict()
+        if self.a is not None:
+            i['parameters']['a'] = self.a
+        i['parameters']['t'] = self.t
+        i['parameters']['layout'] = OrderedDict()
+        i['parameters']['layout']['V1'] = self.V1
+        i['parameters']['layout']['boa'] = self.boa
+        i['parameters']['layout']['N'] = self.N
+        i['results'] = self.results
         return i
-
-def run_example_experiment(e, r=(0,10)):
-    e.start()
-    s = ExampleSimulation()
-    for i in range(*r):
-        m = e.new_measurement()
-        m.start()
-        s.a = i
-        s.init()
-        s.run()
-        m.end()
-        m.save(s)
-    e.end()
-    e.save()
 
 class TestExperiment(unittest.TestCase):
     def setUp(self):
@@ -231,6 +221,20 @@ class TestExperiment(unittest.TestCase):
         e = Experiment(self.d, config=c)
         self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.xml')))
         self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000010.xml')))
+
+    def run_example_experiment_1(self, e, r=(0,10)):
+        e.start()
+        s = ExampleSimulation()
+        for i in range(*r):
+            m = e.new_measurement()
+            m.start()
+            s.a = i
+            s.init()
+            s.run()
+            m.end()
+            m.save(s)
+        e.end()
+        e.save()
     
     def test_standalone_experiment(self):
         e = Experiment(self.d,config=self.c)
@@ -240,7 +244,7 @@ class TestExperiment(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000003.xml')))
 
         e.description = 'Test experiment'
-        run_example_experiment(e)
+        self.run_example_experiment_1(e)
 
         del(e)
         e = Experiment(self.d,config=self.c)
@@ -264,7 +268,7 @@ class TestExperiment(unittest.TestCase):
 
     def test_resetting_experiment(self):
         e = Experiment(self.d, config=self.c)
-        run_example_experiment(e)
+        self.run_example_experiment_1(e)
 
         del(e)
         e = Experiment(self.d, config=self.c)
@@ -276,7 +280,7 @@ class TestExperiment(unittest.TestCase):
         
         e = Experiment(self.d,config=self.c)
         e.reset()
-        run_example_experiment(e, (20,25))
+        self.run_example_experiment_1(e, (20,25))
         e.start()
 
         del(e)
@@ -291,7 +295,7 @@ class TestExperiment(unittest.TestCase):
         c = copy.copy(self.c)
         c.measurement_file = '${measurement_id}.xml'
         e = Experiment(self.d, config=c)
-        run_example_experiment(e)
+        self.run_example_experiment_1(e)
 
         self.assertTrue(os.path.exists(os.path.join(self.d, '000001.xml')))
         self.assertEqual(e.number_of_measurements(), 10)
@@ -303,14 +307,14 @@ class TestExperiment(unittest.TestCase):
         c = copy.copy(self.c)
         c.measurement_file = 'blah.xml'
         e = Experiment(self.d, config=c)
-        run_example_experiment(e)
+        self.run_example_experiment_1(e)
 
         self.assertTrue(os.path.exists(os.path.join(self.d, 'blah.xml')))
         self.assertEqual(e.number_of_measurements(), 1)
 
     def test_continuing_measurements_in_experiment(self):
         e = Experiment(self.d,config=self.c)
-        run_example_experiment(e)
+        self.run_example_experiment_1(e)
 
         self.assertEqual(e.number_of_measurements(), 10)
         for i,m in enumerate(e.measurements()):
@@ -327,7 +331,7 @@ class TestExperiment(unittest.TestCase):
             self.assertEqual(m['parameters/a'], i)
         
         e = Experiment(self.d,config=self.c)
-        run_example_experiment(e, (20,25))
+        self.run_example_experiment_1(e, (20,25))
 
         del(e)
         e = Experiment(self.d,config=self.c)
@@ -342,7 +346,7 @@ class TestExperiment(unittest.TestCase):
 
     def test_experiment_with_missing_measurements(self):
         e = Experiment(self.d,config=self.c)
-        run_example_experiment(e)
+        self.run_example_experiment_1(e)
 
         f1 = os.path.join(self.d, 'measurement.000001.xml')
         f2 = os.path.join(self.d, 'measurement.000007.xml')
@@ -370,6 +374,15 @@ class TestExperiment(unittest.TestCase):
         self.assertEqual(p['parameters/layout/V1'], 2)
         self.assertEqual(p[0], 1)
         self.assertEqual(p[1], 2)
+        self.assertTrue(p.has('t'))
+        self.assertTrue(p.has('parameters/t'))
+        self.assertTrue(p.has('V1'))
+        self.assertTrue(p.has('parameters/layout/V1'))
+        self.assertFalse(p.has('parameters/quark'))
+        self.assertEqual(p.get('t'), 1)
+        self.assertEqual(p.get('parameters/t'), 1)
+        self.assertEqual(p.get('V1'), 2)
+        self.assertEqual(p.get('parameters/layout/V1'), 2)
         with self.assertRaises(IndexError):
             a = p['t']
         with self.assertRaises(IndexError):
@@ -378,6 +391,10 @@ class TestExperiment(unittest.TestCase):
             a = p[2]
         with self.assertRaises(AttributeError):
             a = p.parameters
+        with self.assertRaises(ExperimentError):
+            a = p.get('parameters/quark')
+        with self.assertRaises(ExperimentError):
+            a = p.get('V2')
 
     def test_construct_an_invalid_parameter_set_fails(self):
         d = OrderedDict([('t','parameters/t'),('V1','parameters/layout/V1')])
@@ -530,6 +547,99 @@ class TestExperiment(unittest.TestCase):
             self.assertEqual(p[1], i%100+100)
             i += 1
 
+    def create_example_result_list(self):
+        d1 = OrderedDict([('t','parameters/t'),('V1','parameters/layout/V1')])
+        d2 = OrderedDict([('t','parameters/t'),('V1','parameters/layout/V1'),('a','parameters/a')])
+        rs = ResultList()
+        r = Result()
+        r.parameters = ParameterSet(d1,[1,100])
+        r.table_columns = ('boa', 'P_1', 'P_2')
+        rs.append(r)
+        r = Result()
+        r.parameters = ParameterSet(d1,[2,100])
+        r.table_columns = ('boa', 'P_1', 'P_2')
+        rs.append(r)
+        r = Result()
+        r.parameters = ParameterSet(d1,[1,200])
+        r.table_columns = ('boa', 'P_1', 'P_2')
+        rs.append(r)
+        r = Result()
+        r.parameters = ParameterSet(d1,[2,200])
+        r.table_columns = ('boa', 'P_1', 'P_2')
+        rs.append(r)
+        r = Result()
+        r.parameters = ParameterSet(d2,[1,250,10])
+        r.table_columns = ('boa', 'P_1', 'P_2')
+        rs.append(r)
+        r = Result()
+        r.parameters = ParameterSet(d2,[1,150,20])
+        r.table_columns = ('boa', 'P_1', 'P_2')
+        rs.append(r)
+        return rs
+
+    def test_result_list(self):
+        rs = self.create_example_result_list()
+
+        self.assertEqual(len(rs), 6)
+        self.assertEqual(len(rs['t',1]),4)
+        self.assertEqual(len(rs['V1',200]),2)
+        self.assertEqual(len(rs['a',10]),1)
+        self.assertEqual(len(rs['a',30]),0)
+
+        self.assertEqual(len(rs['t',1]['a',10]),1)
+        self.assertEqual(len(rs['t',1]['V1',200]),1)
+        self.assertEqual(len(rs['a',30]['t',1]),0)
+        
+        self.assertTrue(rs['t',1]['V1',100][0] is rs[0])
+        self.assertTrue(rs['t',1]['V1',150][0] is rs[5])
+        
+        self.assertEqual(len(rs['t',1][1:3]),2)
+        self.assertEqual(len(rs[0:4]['t',1]),2)
+        self.assertEqual(len(rs[:]['t',1]),4)
+        self.assertEqual(len(rs[0:5:2]['t',1]),3)
+
+        self.assertEqual(len(rs['parameters/t',1]),4)
+        self.assertEqual(len(rs['parameters/layout/V1',100]),2)
+
+        # a bit unrelated: demonstrate that sorting works
+        # note: rs['t',1].sort(f) does not work, because the [] operator
+        # creates a new copy of the list
+        f = lambda x,y: -1 if x.parameters.V1<y.parameters.V1 else 0
+        rs2 = rs['t',1]
+        rs2.sort(f)
+        rs3 = sorted(rs['t',1], f)
+        self.assertEqual(rs2,rs3)
+        self.assertEqual(len(rs2), 4)
+        self.assertTrue(rs2[0] is rs[0])
+        self.assertTrue(rs2[1] is rs[5])
+        self.assertTrue(rs2[2] is rs[2])
+        self.assertTrue(rs2[3] is rs[4])
+
+        # Does not throw an exception, but does not do anything useful
+        self.assertEqual(len(rs[1,2]), 0)
+        # Nonexisting parameter
+        self.assertEqual(len(rs['blub',2]), 0)
+        # Bogus parameter values
+        self.assertEqual(len(rs['t','muh']), 0)
+
+        # Invalid usage
+        with self.assertRaises(TypeError):
+            r = rs['t',1,'V1',100]
+        with self.assertRaises(TypeError):
+            r = rs['t',1,2]
+        with self.assertRaises(TypeError):
+            r = rs['t']
+        with self.assertRaises(TypeError):
+            r = rs['quark']
+
+    def test_print_results(self):
+        # no unit tests, just looking at the output
+        rs = self.create_example_result_list()
+        #print(rs)
+        for r in rs:
+            #print(r)
+            pass
+
     def run_example_experiment_2(self):
         e = Experiment(self.d,config=self.c)
 
@@ -539,6 +649,145 @@ class TestExperiment(unittest.TestCase):
 
             s = ExampleSimulation()
             s.t = p.t
+            s.V1 = p.V1
+            # artificially create some measurements with missing parameter N
+            if p.a != 10:
+                s.a = p.a
+            else:
+                s.a = None
+            s.N = p.N
+            s.init()
+            s.run()
+            s.results = OrderedDict()
+            if p.N == 2:
+                s.results['P'] = [s.V1*10,s.V1*20]
+            elif p.N == 3:
+                s.results['P'] = [s.V1*10,s.V1*20,s.V1*30]
+            else:
+                s.results['P'] = [s.V1*10,s.V1*20,s.V1*30,s.V1*40]
+            s.results['N'] = OrderedDict()
+            s.results['N']['all'] = s.t * 100
+
+            m.end()
+            m.save(s)
+
+        e.define_parameter_set(
+            ('t','parameters/t'),
+            ('a','parameters/a'),
+            ('V1','parameters/layout/V1'),
+            ('N','parameters/layout/N'))
+        for N in [2,3,4]:
+            for t in [1,2]:
+                for a in [10,20,30]:
+                    for V1 in range(100,110):
+                        e.add_parameter_set(t,a,V1,N)
+        r,t = e.run(run_measurement)
+
+    def test_retrieve_results(self):
+        self.run_example_experiment_2()
+
+        e = Experiment(self.d, config=self.c)
+        self.assertEqual(e.number_of_measurements(), 180)
+
+        d = OrderedDict((('V1','parameters/layout/V1'),('P','results/P')))
+        rs = e.retrieve_results(
+                (('V1','parameters/layout/V1'),('P','results/P')),
+                (('t','parameters/t'),('N','parameters/layout/N')))
+
+        #print(rs)
+        
+        # Tests for all parameter sets
+        self.assertEqual(len(rs),6)
+        i = 0
+        for r in rs:
+            self.assertEqual(r.table_definition, d)
+            self.assertEqual(len(r.measurement_ids), 30)
+            i += 1
+        self.assertEqual(i,6)
+
+        # Tests that differ, depending on the parameter set
+        for r in rs['N',2]:
+            self.assertEqual(r.table_columns, ('V1', 'P_1', 'P_2'))
+            self.assertEqual(r.table.shape, (30,3))
+        for r in rs['N',3]:
+            self.assertEqual(r.table_columns, ('V1', 'P_1', 'P_2', 'P_3'))
+            self.assertEqual(r.table.shape, (30,4))
+        for r in rs['N',4]:
+            self.assertEqual(r.table_columns, ('V1', 'P_1', 'P_2', 'P_3', 'P_4'))
+            self.assertEqual(r.table.shape, (30,5))
+        
+        r = rs[0]
+        self.assertEqual(r.parameters.t, 1)
+        self.assertEqual(r.parameters.N, 2)
+        # a is not directly accessible
+        with self.assertRaises(AttributeError):
+            r.parameters.a
+        with self.assertRaises(IndexError):
+            r.parameters['parameters/a']
+        for i,id in enumerate(r.measurement_ids):
+            self.assertEqual(id,i+1)
+            self.assertEqual(r.table[i,0], 100+i%10)
+            self.assertEqual(r.table[i,1], (100+i%10)*10)
+
+    def test_retrieve_results_with_only_some_measurements_matching(self):
+        self.run_example_experiment_2()
+
+        e = Experiment(self.d, config=self.c)
+        self.assertEqual(e.number_of_measurements(), 180)
+
+        tdef = [('V1','parameters/layout/V1'),
+                ('P','results/P')]
+        pdef = [('t','parameters/t'),
+                ('N','parameters/layout/N'),
+                ('a','parameters/a')]
+        rs = e.retrieve_results(tdef,pdef)
+
+        self.assertEqual(len(rs), 12)
+        for r in rs['N',2]:
+            self.assertEqual(r.table_columns, ('V1', 'P_1', 'P_2'))
+            self.assertEqual(r.table.shape, (10,3))
+            self.assertEqual(len(r.measurement_ids),10)
+        for r in rs['N',3]:
+            self.assertEqual(r.table_columns, ('V1', 'P_1', 'P_2', 'P_3'))
+            self.assertEqual(r.table.shape, (10,4))
+            self.assertEqual(len(r.measurement_ids),10)
+        for r in rs['N',4]:
+            self.assertEqual(r.table_columns, ('V1', 'P_1', 'P_2', 'P_3', 'P_4'))
+            self.assertEqual(r.table.shape, (10,5))
+            self.assertEqual(len(r.measurement_ids),10)
+
+        r = rs[0]
+        self.assertEqual(r.parameters.t, 1)
+        self.assertEqual(r.parameters.N, 2)
+        self.assertEqual(r.parameters.a, 20)
+        self.assertEqual(r.parameters['parameters/a'], 20)
+        for i,id in enumerate(r.measurement_ids):
+            self.assertEqual(id,i+11)
+            self.assertEqual(r.table[i,0], 100+i)
+
+    def test_retrieve_results_with_variable_number_of_columns_in_result_table_fails(self):
+        self.run_example_experiment_2()
+
+        e = Experiment(self.d, config=self.c)
+        self.assertEqual(e.number_of_measurements(), 180)
+
+        # Tries to put different number of columns (for different N values)
+        # into to the result table, which fails
+        with self.assertRaises(ExperimentError):
+            rs = e.retrieve_results(
+                    table_definition = [('V1','parameters/layout/V1'),
+                                        ('P','results/P')],
+                    parameter_set_definition = [('t','parameters/t'),
+                                                ('a','parameters/a')])
+
+    def run_example_experiment_3(self):
+        e = Experiment(self.d,config=self.c)
+
+        def run_measurement(p):
+            m = e.new_measurement()
+            m.start()
+
+            s = ExampleSimulation()
             s.V1 = p.V1
             s.init()
             s.run()
@@ -550,47 +799,33 @@ class TestExperiment(unittest.TestCase):
             m.end()
             m.save(s)
 
-        e.define_parameter_set(
-            ('t','parameters/t'),
-            ('a','parameters/a'),
-            ('V1','parameters/layout/V1'))
-        for t in [1,2]:
-            for a in [10,20,30]:
-                for V1 in range(100,200):
-                    e.add_parameter_set(t,V1)
+        e.define_parameter_set((('V1','parameters/layout/V1')))
+        for V1 in range(100,200):
+            e.add_parameter_set(V1)
         r,t = e.run(run_measurement)
-
-    def test_retrieve_results(self):
-        self.run_example_experiment_2()
+    
+    def test_retrieve_results_for_a_simple_experiment(self):
+        self.run_example_experiment_3()
 
         e = Experiment(self.d, config=self.c)
-        self.assertEqual(e.number_of_measurements(), 600)
+        self.assertEqual(e.number_of_measurements(), 100)
 
-        d = OrderedDict((('V1','parameters/layout/V1'),('P','results/P')))
-        rs = e.retrieve_results(
-                (('V1','parameters/layout/V1'),('P','results/P')),
-                (('t','parameters/t'),('a','parameters/a')))
+        tdef = [('V1','parameters/layout/V1'),
+                ('P','results/P'),
+                ('N','results/N/all')]
+        rs = e.retrieve_results(tdef)
 
-        self.assertEqual(len(rs),6)
-        i = 0
-        for r in rs:
-            self.assertEqual(r.table.shape, (200,3))
-            self.assertEqual(r.table_definition, d)
-            self.assertEqual(r.table_columns, ['V1', 'P_1', 'P_2'])
-            self.assertEqual(len(r.measurement_ids), 200)
-            i += 1
-        self.assertEqual(i,6)
-
+        self.assertEqual(len(rs), 1)
         r = rs[0]
-        self.assertEqual(r.parameters.t, 1)
-        self.assertEqual(r.parameters.a, 10)
-        # TODO: more tests on r go here
+        self.assertEqual(r.table.shape,(100,4))
+        self.assertEqual(len(r.measurement_ids),100)
+        self.assertEqual(r.table_columns, ('V1', 'P_1', 'P_2', 'N'))
 
-        # Retrieve a Results object (similar to a list of results), i.e. this is a filter
-        # Don't implement this for now
-        # rs2 = rs.where() ?
-
-        # Should retrieve exactly one result object
-        r = rs.get({'t':1, 'a':10})
-        # or
-        r = rs.get(('t', 1), ('a', 10))
+        # This works, but does not really make sense. It would be better if it
+        # failed, i.e. threw an exception.
+        tdef = [('V1','parameters/layout/V1'),
+                ('P','results/P'),
+                ('N','results/N')]
+        rs = e.retrieve_results(tdef)
+        self.assertEqual(rs[0].table.shape, (100,4))
+        #print(rs[0].table)
