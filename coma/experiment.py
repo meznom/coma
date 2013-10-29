@@ -11,6 +11,32 @@ from .measurement import Measurement
 class ExperimentError(Exception):
     pass
 
+class ParameterSet(object):
+    def __init__(self, definition, parameter_tuple):
+        if len(definition) != len(parameter_tuple):
+            raise ExperimentError('ParameterSet: Parameter set definition and '
+                                  'provided parameters do not agree')
+        self.d = definition
+        self.ps = parameter_tuple
+        self.names = {}
+        for i,n in enumerate(definition.values()):
+            self.names[n] = i
+        self.shortnames = {}
+        for i,n in enumerate(definition.keys()):
+            self.shortnames[n] = i
+
+    def __getattr__(self, n):
+        if not self.shortnames.has_key(n):
+            raise AttributeError()
+        return self.ps[ self.shortnames[n] ]
+
+    def __getitem__(self, n):
+        if isinstance(n, int):
+            return self.ps[n]
+        if not self.names.has_key(n):
+            raise IndexError()
+        return self.ps[ self.names[n] ]
+
 class Experiment(object):
     def __init__(self, dir, id=None, description=None, tags=[], config=Config()):
         self.dir = dir
@@ -21,6 +47,9 @@ class Experiment(object):
         self.start_date = None
         self.end_date = None
         self.config = config
+
+        self.pset_definition = OrderedDict()
+        self.psets = []
         
         self.eindex = None
         if os.path.exists(self.config.experiment_index_path):
@@ -64,49 +93,6 @@ class Experiment(object):
                                       'which match the provided experiment id')
             self.file = os.path.join(self.dir, d[self.id])
         self.load()
-
-    def _experiment_filename(self):
-        idstr = 'none'
-        if isinstance(self.id, int):
-            idstr = '{:06d}'.format(self.id)
-        s = self.config.experiment_file
-        s = Template(s)
-        s = s.substitute(experiment_id=idstr)
-        return s
-    
-    def _measurement_filename(self, mid):
-        idstr = 'none'
-        if isinstance(mid, int):
-            idstr = '{:06d}'.format(mid)
-        s = self.config.measurement_file
-        s = Template(s)
-        s = s.substitute(measurement_id=idstr)
-        return s
-
-    def _matching_experiment_files(self):
-        return self._matching_files(self.config.experiment_file, 'experiment_id')
-    
-    def _matching_measurement_files(self):
-        return self._matching_files(self.config.measurement_file, 'measurement_id')
-
-    def _matching_files(self, pattern, sub):
-        # Build a regular expression from the experiment_file config variable
-        s = pattern
-        s = s.replace('.','\.').replace('/','\/')
-        s = '^' +  Template(s).substitute({sub: '(\d+)'}) + '$'
-        e = re.compile(s)
-        
-        # All files in current directory that match
-        rs = []
-        fs = os.listdir(self.dir)
-        for f in fs:
-            m  = e.match(f)
-            if m is not None:
-                if len(m.groups()) > 0:
-                    rs.append((int(m.group(1)),m.group(0)))
-                else:
-                    rs.append((0,m.group(0)))
-        return rs
 
     def save(self):
         i = OrderedDict([
@@ -154,9 +140,6 @@ class Experiment(object):
     def end (self):
         self.end_date = current_date_as_string()
 
-    def run(self):
-        raise NotImplementedError()
-
     def reset(self):
         self.mindex.createfile()
         self.last_mid = self.mindex.read()
@@ -183,6 +166,85 @@ class Experiment(object):
 
     def number_of_measurements(self):
         return len(self._matching_measurement_files())
+
+    def define_parameter_set(self, *args):
+        self.pset_definition = OrderedDict(args)
+
+    def add_parameter_set(self, *args):
+        p = tuple(args)
+        self.psets.append(p)
+
+    def run(self, run_measurement=None):
+        if run_measurement is None:
+            run_measurement = self.run_measurement
+
+        existing = self._get_existing_psets()
+        todo = [p for p in self.psets if p not in existing]
+
+        self.start()
+        for p in todo:
+            run_measurement(ParameterSet(self.pset_definition, p))
+        self.end()
+
+        return (len(todo),len(self.psets))
+
+    def run_measurement(self, parameter_set):
+        raise NotImplementedError()
+
+    def _get_existing_psets(self):
+        ps = []
+        for m in self.measurements():
+            try:
+                p = []
+                for name,path in self.pset_definition.iteritems():
+                    p.append(m[path])
+                ps.append(tuple(p))
+            except KeyError:
+                pass
+        return ps
+
+    def _experiment_filename(self):
+        idstr = 'none'
+        if isinstance(self.id, int):
+            idstr = '{:06d}'.format(self.id)
+        s = self.config.experiment_file
+        s = Template(s)
+        s = s.substitute(experiment_id=idstr)
+        return s
+
+    def _measurement_filename(self, mid):
+        idstr = 'none'
+        if isinstance(mid, int):
+            idstr = '{:06d}'.format(mid)
+        s = self.config.measurement_file
+        s = Template(s)
+        s = s.substitute(measurement_id=idstr)
+        return s
+
+    def _matching_experiment_files(self):
+        return self._matching_files(self.config.experiment_file, 'experiment_id')
+
+    def _matching_measurement_files(self):
+        return self._matching_files(self.config.measurement_file, 'measurement_id')
+
+    def _matching_files(self, pattern, sub):
+        # Build a regular expression from the experiment_file config variable
+        s = pattern
+        s = s.replace('.','\.').replace('/','\/')
+        s = '^' +  Template(s).substitute({sub: '(\d+)'}) + '$'
+        e = re.compile(s)
+
+        # All files in current directory that match
+        rs = []
+        fs = os.listdir(self.dir)
+        for f in fs:
+            m  = e.match(f)
+            if m is not None:
+                if len(m.groups()) > 0:
+                    rs.append((int(m.group(1)),m.group(0)))
+                else:
+                    rs.append((0,m.group(0)))
+        return rs
 
     def __str__(self):
         s = 'Experiment {}'.format(self.id)

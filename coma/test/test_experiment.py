@@ -3,7 +3,7 @@ from collections import OrderedDict
 import os
 import shutil
 import copy
-from coma import Measurement, Experiment, ExperimentError, Config, IndexFile
+from coma import Measurement, Experiment, ExperimentError, Config, IndexFile, ParameterSet
 
 _EXP_FILE_1='''\
 <experiment>
@@ -28,7 +28,9 @@ class ExampleSimulation(object):
         self.program = 'ExampleSimulation'
         self.version = 0.1
         self.a = 1
-        self.b = 2
+        self.t = 2
+        self.V1 = 100
+        self.boa = 2.2
         self.energies = [1,2,3,4]
 
     def init(self):
@@ -41,7 +43,8 @@ class ExampleSimulation(object):
         i = OrderedDict([
             ('parameters', OrderedDict([
                         ('a', self.a),
-                        ('b', self.b)])),
+                        ('t', self.t),
+                        ('layout', OrderedDict([('V1', self.V1),('boa', self.boa)]))])),
             ('results', OrderedDict([
                         ('energies', self.energies)]))
             ])
@@ -355,3 +358,174 @@ class TestExperiment(unittest.TestCase):
             self.assertEqual(m['parameters/a'], ns[i])
             c += 1
         self.assertEqual(c,8)
+
+    def test_construct_and_use_a_parameter_set(self):
+        d = OrderedDict([('t','parameters/t'),('V1','parameters/layout/V1')])
+        ps = [1,2]
+
+        p = ParameterSet(d,ps)
+        self.assertEqual(p.t, 1)
+        self.assertEqual(p.V1, 2)
+        self.assertEqual(p['parameters/t'], 1)
+        self.assertEqual(p['parameters/layout/V1'], 2)
+        self.assertEqual(p[0], 1)
+        self.assertEqual(p[1], 2)
+        with self.assertRaises(IndexError):
+            a = p['t']
+        with self.assertRaises(IndexError):
+            a = p['V1']
+        with self.assertRaises(IndexError):
+            a = p[2]
+        with self.assertRaises(AttributeError):
+            a = p.parameters
+
+    def test_construct_an_invalid_parameter_set_fails(self):
+        d = OrderedDict([('t','parameters/t'),('V1','parameters/layout/V1')])
+        ps = [1,2,3]
+        with self.assertRaises(ExperimentError):
+            ParameterSet(d,ps)
+
+        # Construction with an invalid short name does not through an error...
+        d = OrderedDict([('t','parameters/t'),('V1','parameters/layout/V1'),
+                         ('a.b','parameters/a/b')])
+        ps = [1,2,3]
+        p = ParameterSet(d,ps)
+        with self.assertRaises(AttributeError):
+            a = p.a.b
+
+    def test_use_parameter_sets(self):
+        e = Experiment(self.d,config=self.c)
+        e.define_parameter_set(
+            ('t','parameters/t'),
+            ('V1','parameters/layout/V1'))
+        for t in [1,2]:
+            for V1 in range(100,200):
+                e.add_parameter_set(t,V1)
+
+        def run_measurement(p):
+            m = e.new_measurement()
+            m.start()
+
+            s = ExampleSimulation()
+            s.t = p.t
+            s.V1 = p.V1
+            s.init()
+            s.run()
+
+            m.end()
+            m.save(s)
+
+        r,t = e.run(run_measurement)
+
+        self.assertEqual(r, 200)
+        self.assertEqual(t, 200)
+
+        self.assertEqual(e.number_of_measurements(), 200)
+        i = 0
+        for m in e.measurements():
+            if i<100:
+                self.assertEqual(m['parameters/t'], 1)
+            else:
+                self.assertEqual(m['parameters/t'], 2)
+            self.assertEqual(m['parameters/layout/V1'], i%100+100)
+            i += 1
+
+    def test_use_parameter_sets_with_a_subclass_of_experiment(self):
+        class MyExperiment(Experiment):
+            def init(self):
+                self.define_parameter_set(
+                    ('t','parameters/t'),
+                    ('V1','parameters/layout/V1'))
+                for t in [1,2]:
+                    for V1 in range(100,200):
+                        self.add_parameter_set(t,V1)
+
+            def run_measurement(self, p):
+                m = self.new_measurement()
+                m.start()
+
+                s = ExampleSimulation()
+                s.t = p.t
+                s.V1 = p.V1
+                s.init()
+                s.run()
+
+                m.end()
+                m.save(s)
+
+        e = MyExperiment(self.d,config=self.c)
+        e.init()
+        r,t = e.run()
+
+        self.assertEqual(r, 200)
+        self.assertEqual(t, 200)
+
+        self.assertEqual(e.number_of_measurements(), 200)
+        i = 0
+        for m in e.measurements():
+            if i<100:
+                self.assertEqual(m['parameters/t'], 1)
+            else:
+                self.assertEqual(m['parameters/t'], 2)
+            self.assertEqual(m['parameters/layout/V1'], i%100+100)
+            i += 1
+
+    def test_running_the_experiment_only_computes_missing_parameter_sets(self):
+        e = Experiment(self.d,config=self.c)
+        e.define_parameter_set(
+            ('t','parameters/t'),
+            ('V1','parameters/layout/V1'))
+        for t in [1]:
+            for V1 in range(100,200):
+                e.add_parameter_set(t,V1)
+
+        def run_measurement(p):
+            m = e.new_measurement()
+            m.start()
+
+            s = ExampleSimulation()
+            s.t = p.t
+            s.V1 = p.V1
+            s.init()
+            s.run()
+
+            m.end()
+            m.save(s)
+
+        r,t = e.run(run_measurement)
+        self.assertEqual(r, 100)
+        self.assertEqual(t, 100)
+        self.assertEqual(e.number_of_measurements(), 100)
+
+        # add some additional parameter sets
+        for t in [2]:
+            for V1 in range(100,200):
+                e.add_parameter_set(t,V1)
+
+        # delete some existing measurements
+        f1 = os.path.join(self.d, 'measurement.000011.xml')
+        f2 = os.path.join(self.d, 'measurement.000042.xml')
+        self.assertTrue(os.path.exists(f1))
+        self.assertTrue(os.path.exists(f2))
+        os.remove(f1)
+        os.remove(f2)
+
+        # and run again
+        r,t = e.run(run_measurement)
+        self.assertEqual(r, 102)
+        self.assertEqual(t, 200)
+        self.assertEqual(e.number_of_measurements(), 200)
+
+        ps = []
+        for m in e.measurements():
+            ps.append((m['parameters/t'], m['parameters/layout/V1']))
+        self.assertEqual(len(ps), 200)
+        ps.sort()
+        i = 0
+        for p in ps:
+            if i<100:
+                self.assertEqual(p[0], 1)
+            else:
+                self.assertEqual(p[0], 2)
+            self.assertEqual(p[1], i%100+100)
+            i += 1
