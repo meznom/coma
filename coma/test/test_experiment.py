@@ -529,3 +529,68 @@ class TestExperiment(unittest.TestCase):
                 self.assertEqual(p[0], 2)
             self.assertEqual(p[1], i%100+100)
             i += 1
+
+    def run_example_experiment_2(self):
+        e = Experiment(self.d,config=self.c)
+
+        def run_measurement(p):
+            m = e.new_measurement()
+            m.start()
+
+            s = ExampleSimulation()
+            s.t = p.t
+            s.V1 = p.V1
+            s.init()
+            s.run()
+            s.results = OrderedDict()
+            s.results['P'] = [s.V1*10,s.V1*20]
+            s.results['N'] = OrderedDict()
+            s.results['N']['all'] = s.t * 100
+
+            m.end()
+            m.save(s)
+
+        e.define_parameter_set(
+            ('t','parameters/t'),
+            ('a','parameters/a'),
+            ('V1','parameters/layout/V1'))
+        for t in [1,2]:
+            for a in [10,20,30]:
+                for V1 in range(100,200):
+                    e.add_parameter_set(t,V1)
+        r,t = e.run(run_measurement)
+
+    def test_retrieve_results(self):
+        self.run_example_experiment_2()
+
+        e = Experiment(self.d, config=self.c)
+        self.assertEqual(e.number_of_measurements(), 600)
+
+        d = OrderedDict((('V1','parameters/layout/V1'),('P','results/P')))
+        rs = e.retrieve_results(
+                (('V1','parameters/layout/V1'),('P','results/P')),
+                (('t','parameters/t'),('a','parameters/a')))
+
+        self.assertEqual(len(rs),6)
+        i = 0
+        for r in rs:
+            self.assertEqual(r.table.shape, (200,3))
+            self.assertEqual(r.table_definition, d)
+            self.assertEqual(r.table_columns, ['V1', 'P_1', 'P_2'])
+            self.assertEqual(len(r.measurement_ids), 200)
+            i += 1
+        self.assertEqual(i,6)
+
+        r = rs[0]
+        self.assertEqual(r.parameters.t, 1)
+        self.assertEqual(r.parameters.a, 10)
+        # TODO: more tests on r go here
+
+        # Retrieve a Results object (similar to a list of results), i.e. this is a filter
+        # Don't implement this for now
+        # rs2 = rs.where() ?
+
+        # Should retrieve exactly one result object
+        r = rs.get({'t':1, 'a':10})
+        # or
+        r = rs.get(('t', 1), ('a', 10))
