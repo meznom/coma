@@ -7,7 +7,7 @@ except ImportError:
 
 from .experiment import Experiment, ExperimentError, ParameterSet, Result, ResultList
 from .measurement import Measurement
-from .serialization import XMLArchive, XMLArchiveError, Serializer, SerializerError, Restorer
+from .serialization import XMLArchive, XMLArchiveError, JsonArchive, JsonArchiveError, Serializer, Restorer
 from .config import Config
 from .indexfile import IndexFile
 import test

@@ -1,12 +1,10 @@
 from collections import OrderedDict
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+import json
 import re
 from importlib import import_module
 import math
-
-class SerializerError(Exception):
-    pass
 
 class Serializer(object):
     def serialize(self, o):
@@ -14,11 +12,12 @@ class Serializer(object):
             d = o.__getstate__()
             d['__class__'] = str(o.__class__)
             return d
-        raise SerializerError('Can\'t serialize ' + repr(o))
+        raise TypeError('Can\'t serialize ' + repr(o))
 
     def restore(self, o):
         return o
 
+# note: currently unused and untested
 class Restorer(Serializer):
     def restore(self, o):
         if isinstance(o, dict) and '__class__' in o:
@@ -53,11 +52,14 @@ class XMLArchiveError(Exception):
     pass
 
 class XMLArchive(object):
-    def __init__(self, root_tag=None, serializer=Serializer, pretty_print=True, indent='  '):
+    def __init__(self, root_tag=None, serializer=Serializer, indent=2):
         self.root_tag = root_tag
         self.s = serializer()
-        self.pretty_print = pretty_print
-        self.indent = indent
+        self.pretty_print = False
+        self.indent = ''
+        if indent is not None:
+            self.pretty_print = True
+            self.indent = ' ' * indent
         # this is taken from json.scanner
         self.number_re = re.compile(
             r'^(-?(?:0|[1-9]\d*))(\.\d+)?([eE][-+]?\d+)?$',
@@ -178,3 +180,49 @@ class XMLArchive(object):
                 return float(i + (f or '') + (e or ''))
             else:
                 return int(i)
+
+class JsonArchiveError(Exception):
+    pass
+
+class JsonArchive(object):
+    def __init__(self, root_tag=None, serializer=Serializer, indent=2):
+        self.root_tag = root_tag
+        self.s = serializer()
+        self.indent = indent
+        self.separators = (',',': ')
+        if self.indent is None:
+            # no pretty printing
+            self.separators = (',',':')
+
+    def dumps(self, o):
+        if self.root_tag is not None:
+            o = OrderedDict([(self.root_tag, o)])
+        return json.dumps(o, default=self.s.serialize, 
+                             indent=self.indent, 
+                             separators=self.separators)
+
+    def dump(self, o, f):
+        if self.root_tag is not None:
+            o = OrderedDict([(self.root_tag, o)])
+        json.dump(o, f, default=self.s.serialize,
+                        indent=self.indent, 
+                        separators=self.separators)
+
+    def loads(self, s):
+        return self._load(s, json.loads)
+        o = json.loads(s, object_pairs_hook=lambda d: self.s.restore(OrderedDict(d)))
+
+    def load(self, f):
+        return self._load(f, json.load)
+
+    def _load(self, s_or_f, json_load):
+        try:
+            o = json_load(s_or_f, object_pairs_hook=lambda d: self.s.restore(OrderedDict(d)))
+            if self.root_tag is not None:
+                if not isinstance(o, dict) or not o.has_key(self.root_tag):
+                    raise JsonArchiveError('Did not find top-level entry "{}" in JSON '
+                                           'string'.format(self.root_tag))
+                o = o[self.root_tag]
+            return o
+        except ValueError as e:
+            raise JsonArchiveError(e.message)
