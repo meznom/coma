@@ -48,6 +48,35 @@ class MemoryArchive(object):
         else:
             return self.encode(self.s.serialize(o))
 
+class ArchiveError(Exception):
+    pass
+
+class Archive(object):
+    def __init__(self, root_tag=None, serializer=Serializer, indent=2):
+        self.root_tag = root_tag
+        self.serializer = serializer
+        self.indent = indent
+        self.formats = {'json': JsonArchive, 'xml': XMLArchive}
+        self.r = re.compile('^.+\.(\w+)$')
+
+    def dumpfile(self, o, filename):
+        a = self._archive_factory(filename)
+        a.dumpfile(o, filename)
+
+    def loadfile(self, filename):
+        a = self._archive_factory(filename)
+        return a.loadfile(filename)
+
+    def _archive_factory(self, filename):
+        m = self.r.match(filename)
+        if m is None or len(m.groups()) != 1:
+            raise ArchiveError('Cannot infer archive format form filename')
+        f = m.groups()[0]
+        if not self.formats.has_key(f):
+            raise ArchiveError('Unsupported archive format: {}'.format(f))
+        A = self.formats[f]
+        return A(self.root_tag, self.serializer, self.indent)
+
 class XMLArchiveError(Exception):
     pass
 
@@ -64,6 +93,17 @@ class XMLArchive(object):
         self.number_re = re.compile(
             r'^(-?(?:0|[1-9]\d*))(\.\d+)?([eE][-+]?\d+)?$',
             (re.VERBOSE | re.MULTILINE | re.DOTALL))
+
+    def dumpfile(self, o, filename):
+        f = open(filename, 'w')
+        self.dump(o, f)
+        f.close()
+
+    def loadfile(self, filename):
+        f = open(filename)
+        o = self.load(f)
+        f.close()
+        return o
         
     def dumps(self, o):
         s = ET.tostring(self._dump_to_element(o))
@@ -194,6 +234,17 @@ class JsonArchive(object):
             # no pretty printing
             self.separators = (',',':')
 
+    def dumpfile(self, o, filename):
+        f = open(filename, 'w')
+        self.dump(o, f)
+        f.close()
+
+    def loadfile(self, filename):
+        f = open(filename)
+        o = self.load(f)
+        f.close()
+        return o
+        
     def dumps(self, o):
         if self.root_tag is not None:
             o = OrderedDict([(self.root_tag, o)])

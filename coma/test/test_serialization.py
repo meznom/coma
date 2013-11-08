@@ -1,8 +1,10 @@
 import unittest
 from collections import OrderedDict
-from coma import XMLArchive, XMLArchiveError, JsonArchive, JsonArchiveError
+from coma import XMLArchive, XMLArchiveError, JsonArchive, JsonArchiveError, \
+                 Archive, ArchiveError
 import os
 import math
+import filecmp
 
 _SIMPLE_XML='''\
 <measurement>
@@ -477,3 +479,70 @@ class TestJsonArchive(unittest.TestCase):
         self.assertEqual(d[1:], d2[1:])
         self.assertTrue(math.isnan(d[0]))
         self.assertTrue(math.isnan(d2[0]))
+
+class TestArchive(unittest.TestCase):
+    def test_dump_with_invalid_filename(self):
+        with self.assertRaises(ArchiveError):
+            a = Archive()
+            a.dumpfile(test_data['simple'], 'testarchive.blu-b')
+        
+        with self.assertRaises(ArchiveError):
+            a = Archive()
+            a.dumpfile(test_data['simple'], 'testarchive.blu/blah')
+
+        with self.assertRaises(ArchiveError):
+            a = Archive()
+            a.dumpfile(test_data['simple'], 'testarchive.xml/')
+        
+        with self.assertRaises(ArchiveError):
+            a = Archive()
+            a.dumpfile(test_data['simple'], 'testarchive.txt')
+        
+        with self.assertRaises(ArchiveError):
+            a = Archive()
+            a.loadfile('testarchive.txt')
+
+    def test_dump_to_xml_and_json(self):
+        f1 = 'testarchive.xml'
+        f1_ref = 'testarchive_reference.xml'
+        f2 = 'testarchive.json'
+        f2_ref = 'testarchive_reference.json'
+        f = open(f1_ref, 'w')
+        f.write(test_xml['list'])
+        f.close()
+        f = open(f2_ref, 'w')
+        f.write(test_json['list'])
+        f.close()
+        
+        a = Archive('measurement', indent=8)
+        a.dumpfile(test_data['list'], f1)
+        a.dumpfile(test_data['list'], f2)
+
+        self.assertTrue(os.path.exists(f1))
+        self.assertTrue(os.path.exists(f2))
+
+        self.assertTrue(filecmp.cmp(f1, f1_ref))
+        self.assertTrue(filecmp.cmp(f2, f2_ref))
+
+        for f in [f1,f2,f1_ref,f2_ref]:
+            os.remove(f)
+
+    def test_load_from_xml_and_json(self):
+        f1 = 'testarchive.xml'
+        f2 = 'testarchive.json'
+        f = open(f1, 'w')
+        f.write(test_xml['simple'])
+        f.close()
+        f = open(f2, 'w')
+        f.write(test_json['simple'])
+        f.close()
+
+        a = Archive('measurement')
+        o1 = a.loadfile(f1)
+        o2 = a.loadfile(f2)
+
+        self.assertEqual(o1, test_data['simple'])
+        self.assertEqual(o2, test_data['simple'])
+
+        for f in [f1,f2]:
+            os.remove(f)
