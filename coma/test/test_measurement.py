@@ -32,14 +32,15 @@ class ExampleSimulation(object):
 class TestMeasurement(unittest.TestCase):
     def setUp(self):
         base_dir = os.path.dirname(__file__)
-        self.f = os.path.join(base_dir, 'testmeasurement.xml')
+        self.f = os.path.join(base_dir, 'testmeasurement')
+        self.fn = os.path.join(base_dir, 'testmeasurement.xml')
         
-        if os.path.exists(self.f):
-            os.remove(self.f)
+        if os.path.exists(self.fn):
+            os.remove(self.fn)
 
     def tearDown(self):
-        if os.path.exists(self.f):
-            os.remove(self.f)
+        if os.path.exists(self.fn):
+            os.remove(self.fn)
 
     def test_create_measurement_without_id(self):
         m = Measurement(self.f)

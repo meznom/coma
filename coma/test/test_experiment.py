@@ -54,11 +54,12 @@ class ExampleSimulation(object):
         i['results'] = self.results
         return i
 
+# TODO: test experiment with json files; json and xml mixed
 class TestExperiment(unittest.TestCase):
     def setUp(self):
         base_dir = os.path.dirname(__file__)
         self.d = os.path.join(base_dir, 'testexperiment')
-        self.fi = os.path.join(self.d, 'coma.index.xml')
+        self.fi = os.path.join(self.d, 'coma.index')
         
         if os.path.exists(self.d):
             shutil.rmtree(self.d)
@@ -93,7 +94,7 @@ class TestExperiment(unittest.TestCase):
 
     def test_create_experiment_without_id_in_name(self):
         c = copy.copy(self.c)
-        c.experiment_file = 'experiment.xml'
+        c.experiment_file = 'experiment'
         
         # create a new experiment
         e = Experiment(self.d, description='Blub', config=c)
@@ -126,7 +127,7 @@ class TestExperiment(unittest.TestCase):
 
     def test_create_experiment_without_index_file(self):
         c = copy.copy(self.c)
-        c.experiment_index = '__experimenttest.index.xml'
+        c.experiment_index = '__experimenttest.index'
         
         e = Experiment(self.d,config=c)
         self.assertFalse(os.path.exists(c.experiment_index_path))
@@ -150,7 +151,7 @@ class TestExperiment(unittest.TestCase):
 
     def test_load_experiment_without_id(self):
         c = copy.copy(self.c)
-        c.experiment_file = 'experiment.xml'
+        c.experiment_file = 'experiment'
 
         fn = os.path.join(self.d, 'experiment.xml')
         f = open(fn, 'w')
@@ -179,7 +180,7 @@ class TestExperiment(unittest.TestCase):
         os.remove(fn)
 
         c = copy.copy(self.c)
-        c.experiment_file = 'experiment.xml'
+        c.experiment_file = 'experiment'
         fn = os.path.join(self.d, 'experiment.xml')
         f = open(fn, 'w')
         f.write(_EXP_FILE_2)
@@ -211,7 +212,7 @@ class TestExperiment(unittest.TestCase):
 
     def test_load_experiment_with_wrong_filename(self):
         c = copy.copy(self.c)
-        c.experiment_file = 'experiment.xml'
+        c.experiment_file = 'experiment'
         fn = os.path.join(self.d, 'experiment.000010.xml')
         f = open(fn, 'w')
         f.write(_EXP_FILE_1)
@@ -293,7 +294,7 @@ class TestExperiment(unittest.TestCase):
 
     def test_experiment_with_different_measurement_filename(self):
         c = copy.copy(self.c)
-        c.measurement_file = '${measurement_id}.xml'
+        c.measurement_file = '${measurement_id}'
         e = Experiment(self.d, config=c)
         self.run_example_experiment_1(e)
 
@@ -305,7 +306,7 @@ class TestExperiment(unittest.TestCase):
         # An invalid measurement_file name: the measurement_id is missing
         # In this case, things can't and won't work properly.
         c = copy.copy(self.c)
-        c.measurement_file = 'blah.xml'
+        c.measurement_file = 'blah'
         e = Experiment(self.d, config=c)
         self.run_example_experiment_1(e)
 

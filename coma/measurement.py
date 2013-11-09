@@ -1,6 +1,6 @@
-import os
 from collections import OrderedDict
-from .serialization import XMLArchive, MemoryArchive
+from .serialization import Archive, MemoryArchive, archive_exists
+from .config import Config
 from .path import access_data_by_path
 from .util import current_date_as_string
 
@@ -29,13 +29,13 @@ class DictAsObject(object):
              return a
 
 class Measurement(object):
-    def __init__(self, file, id=None):
-        self.file = file
+    def __init__(self, filename, id=None, config=Config()):
         self.id = id
         self.start_date = None
         self.end_date = None
         self.data = {}
-        if os.path.exists(self.file):
+        self.archive = Archive(filename, 'measurement', default_format=config.default_format)
+        if archive_exists(filename):
             self.load()
 
     def start(self):
@@ -65,17 +65,10 @@ class Measurement(object):
 
         self.data = o
 
-        f = open(self.file, 'w')
-        a = XMLArchive('measurement')
-        a.dump(o, f)
-        f.close()
+        self.archive.save(o)
 
     def load(self):
-        f = open(self.file)
-        a = XMLArchive('measurement')
-        self.data = a.load(f)
-        f.close()
-
+        self.data = self.archive.load()
         i = self.data['info']
         if i.has_key('measurement_id'):
             self.id = i['measurement_id']

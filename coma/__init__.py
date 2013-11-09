@@ -9,7 +9,7 @@ from .experiment import Experiment, ExperimentError, ParameterSet, Result, Resul
 from .measurement import Measurement
 from .serialization import XMLArchive, XMLArchiveError, JsonArchive, \
                            JsonArchiveError, Serializer, Restorer, Archive, \
-                           ArchiveError
+                           ArchiveError, archive_exists
 from .config import Config
 from .indexfile import IndexFile
 import test

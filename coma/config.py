@@ -1,12 +1,14 @@
 import os
 import ConfigParser
+from .serialization import Archive, archive_exists
 
 _CONFIG_FILE='''\
 [coma]
-; experiment_file = experiment.${experiment_id}.xml
-; experiment_index = experiment.index.xml
-; measurement_file = measurement.${measurement_id}.xml
-; measurement_index = measurement.index.xml
+; experiment_file = experiment.${experiment_id}
+; experiment_index = experiment.index
+; measurement_file = measurement.${measurement_id}
+; measurement_index = measurement.index
+; default_format = xml
 '''
 
 class Config(object):
@@ -21,10 +23,11 @@ class Config(object):
         
         # default config settings
         self.configfile = configfile
-        self.experiment_file = 'experiment.${experiment_id}.xml'
-        self.experiment_index = 'experiment.index.xml'
-        self.measurement_file = 'measurement.${measurement_id}.xml'
-        self.measurement_index = 'measurement.index.xml'
+        self.experiment_file = 'experiment.${experiment_id}'
+        self.experiment_index = 'experiment.index'
+        self.measurement_file = 'measurement.${measurement_id}'
+        self.measurement_index = 'measurement.index'
+        self.default_format = 'xml'
 
         # load file, if it exists
         self.load()
@@ -49,7 +52,7 @@ class Config(object):
 
     def _expand_filename(self, f):
         f = os.path.expanduser(f)
-        if os.path.exists(f):
+        if os.path.exists(f) or archive_exists(f):
             f = os.path.abspath(f)
         else:
             p = os.path.expanduser(self._configdir_path)
@@ -73,6 +76,8 @@ class Config(object):
             self.measurement_file = c.get('coma', 'measurement_file')
         if c.has_option('coma', 'measurement_index'):
             self.measurement_index = c.get('coma', 'measurement_index')
+        if c.has_option('coma', 'default_format'):
+            self.default_format = c.get('coma', 'default_format')
 
     def create(self,p=None):
         if p is None:

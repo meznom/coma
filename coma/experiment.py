@@ -3,7 +3,7 @@ import os
 import re
 from string import Template
 import numpy as np
-from .serialization import XMLArchive
+from .serialization import Archive, archive_exists
 from .util import current_date_as_string
 from .indexfile import IndexFile
 from .config import Config
@@ -96,7 +96,7 @@ class Experiment(object):
     def __init__(self, dir, id=None, description=None, tags=[], config=Config()):
         self.dir = dir
         self.id = id
-        self.file = None
+        self.archive = None
         self.description = description
         self.tags = tags
         self.start_date = None
@@ -107,8 +107,9 @@ class Experiment(object):
         self.psets = []
         
         self.eindex = None
-        if os.path.exists(self.config.experiment_index_path):
-            self.eindex = IndexFile(self.config.experiment_index_path, 'experiment')
+        if archive_exists(self.config.experiment_index_path):
+            self.eindex = IndexFile(self.config.experiment_index_path, 
+                                    'experiment', config=self.config)
 
         if not os.path.exists(self.dir):
             os.mkdir(self.dir)
@@ -117,7 +118,7 @@ class Experiment(object):
         # index file is created if it does not exist
         self.last_mid = 0
         mindexfile = os.path.join(self.dir,self.config.measurement_index)
-        self.mindex = IndexFile(mindexfile, 'measurement')
+        self.mindex = IndexFile(mindexfile, 'measurement', config=self.config)
         self.last_mid = self.mindex.read()
 
         # Retrieve files matching the experiment_file config variable.
@@ -135,19 +136,24 @@ class Experiment(object):
         if len(fs) == 0:
             if self.id is None and self.eindex is not None:
                 self.id = self.eindex.increment()
-            self.file = os.path.join(self.dir,self._experiment_filename())
+            f = os.path.join(self.dir,self._experiment_filename())
+            self.archive = Archive(f, 'experiment', default_format=self.config.default_format)
             self.save()
+            self.load()
         elif len(fs) == 1:
             if self.id is None and fs[0][0] != 0:
                 self.id = fs[0][0]
-            self.file = os.path.join(self.dir, fs[0][1])
+            f = os.path.join(self.dir, fs[0][1])
+            self.archive = Archive(f, 'experiment', default_format=self.config.default_format)
+            self.load()
         elif len(fs) > 1:
             d = dict(fs)
             if self.id is None or not d.has_key(self.id):
                 raise ExperimentError('Found multiple experiment files, non of ' +
                                       'which match the provided experiment id')
-            self.file = os.path.join(self.dir, d[self.id])
-        self.load()
+            f = os.path.join(self.dir, d[self.id])
+            self.archive = Archive(f, 'experiment', default_format=self.config.default_format)
+            self.load()
 
     def save(self):
         i = OrderedDict([
@@ -158,29 +164,24 @@ class Experiment(object):
                         ('start_date', self.start_date),
                         ('end_date', self.end_date)]))
             ])
-        backupfile = self.file + '.backup'
-        if os.path.exists(self.file):
-            os.rename(self.file, backupfile)
+        f = self.archive.filename
+        backupfile = f + '.backup'
+        if os.path.exists(f):
+            os.rename(f, backupfile)
 
-        f = open(self.file, 'w')
-        a = XMLArchive('experiment')
-        a.dump(i, f)
-        f.close()
+        self.archive.save(i)
         
         if os.path.exists(backupfile):
             os.remove(backupfile)
 
     def load(self):
-        f = open(self.file)
-        a = XMLArchive('experiment')
-        i = a.load(f)
+        i = self.archive.load()
         i = i['info']
-        f.close()
 
         if self.id is not None and str(self.id) != str(i['experiment_id']):
             raise ExperimentError('Trying to load experiment "{}" from file "{}", '
                     'but this is experiment "{}"'
-                    .format(i['experiment_id'], self.file, self.id))
+                    .format(i['experiment_id'], self.archive.filename, self.id))
         
         self.id = i['experiment_id']
         for k in ['description','start_date','end_date','tags']:
@@ -200,13 +201,16 @@ class Experiment(object):
         self.last_mid = self.mindex.read()
         for _,f in self._matching_measurement_files():
             f = os.path.join(self.dir, f)
-            os.remove(f)
+            # TODO: maybe move functionality to archive, i.e. a method
+            # Archive.delete
+            a = Archive(f)
+            os.remove(a.filename)
 
     def new_measurement(self):
         mid = self.mindex.increment()
         f = self._measurement_filename(mid)
         f = os.path.join(self.dir, f)
-        m = Measurement(f, mid)
+        m = Measurement(f, mid, config=self.config)
         self.last_mid = mid
         return m
 
@@ -214,8 +218,8 @@ class Experiment(object):
         for mid in range(1,self.last_mid+1):
             f = self._measurement_filename(mid)
             f = os.path.join(self.dir, f)
-            if os.path.exists(f):
-                yield Measurement(f, mid)
+            if archive_exists(f):
+                yield Measurement(f, mid, config=self.config)
             else:
                 continue
 
@@ -324,10 +328,11 @@ class Experiment(object):
         return self._matching_files(self.config.measurement_file, 'measurement_id')
 
     def _matching_files(self, pattern, sub):
-        # Build a regular expression from the experiment_file config variable
+        # Build a regular expression from pattern
         s = pattern
         s = s.replace('.','\.').replace('/','\/')
-        s = '^' +  Template(s).substitute({sub: '(\d+)'}) + '$'
+        fs = '|'.join(Archive.formats) # string 'json|xml', or similar
+        s = '^(' +  Template(s).substitute({sub: '(\d+)'}) + ')\.(?:' + fs + ')$'
         e = re.compile(s)
 
         # All files in current directory that match
@@ -336,10 +341,10 @@ class Experiment(object):
         for f in fs:
             m  = e.match(f)
             if m is not None:
-                if len(m.groups()) > 0:
-                    rs.append((int(m.group(1)),m.group(0)))
-                else:
-                    rs.append((0,m.group(0)))
+                if len(m.groups()) == 2:
+                    rs.append((int(m.group(2)),m.group(1)))
+                elif len(m.groups()) == 1:
+                    rs.append((0,m.group(1)))
         return rs
 
     def __str__(self):

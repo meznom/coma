@@ -1,61 +1,46 @@
 import os
-from .serialization import XMLArchive
+from .serialization import Archive, archive_exists
+from .config import Config
 
 class IndexFile(object):
-    def __init__(self, indexfile, indextype):
-        self.f = indexfile
-        self.archive = ''
+    def __init__(self, indexfile, indextype, config=Config()):
         self.element = ''
+        archive_name = ''
         if indextype == 'experiment':
-            self.archive = 'experiments'
+            archive_name = 'experiments'
             self.element = 'last_experiment_id'
         elif indextype == 'measurement':
-            self.archive = 'measurements'
+            archive_name = 'measurements'
             self.element = 'last_measurement_id'
-        if not os.path.exists(self.f):
+        self.archive = Archive(indexfile, archive_name, default_format=config.default_format)
+        if not archive_exists(indexfile):
             self.createfile()
 
     def read(self):
-        #self.mtime = os.path.getmtime(self.f)
-        f = open(self.f)
-        a = XMLArchive(self.archive)
-        o = a.load(f)
-        f.close()
+        o = self.archive.load()
         return o[self.element]
 
     def increment(self):
         self.lock()
-        
-        f = open(self.f, 'r+')
-        a = XMLArchive(self.archive)
-        o = a.load(f)
+        o = self.archive.load()
         o[self.element] += 1
         lastid = o[self.element]
-        
-        f.truncate(0)
-        f.seek(0)
-        a.dump(o,f)
-        f.close()
-        
+        self.archive.save(o)
         self.unlock()
-        
         return lastid
 
     def createfile(self):
-        self.lock()
         o = {self.element: 0}
-        f = open(self.f, 'w')
-        a = XMLArchive(self.archive)
-        a.dump(o,f)
-        f.close()
+        self.lock()
+        self.archive.save(o)
         self.unlock()
 
     def lock(self):
-        lockfile = self.f + '.lock'
+        lockfile = self.archive.filename + '.lock'
         if os.path.exists(lockfile):
-            raise IOError('File "{}" is locked'.format(self.f))
+            raise IOError('File "{}" is locked'.format(self.archive.filename))
         open(lockfile,'a').close()
 
     def unlock(self):
-        lockfile = self.f + '.lock'
+        lockfile = self.archive.filename + '.lock'
         os.remove(lockfile)

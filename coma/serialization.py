@@ -5,6 +5,7 @@ import json
 import re
 from importlib import import_module
 import math
+import os
 
 class Serializer(object):
     def serialize(self, o):
@@ -47,35 +48,6 @@ class MemoryArchive(object):
             return OrderedDict([(self.encode(k), self.encode(v)) for k,v in o.iteritems()])
         else:
             return self.encode(self.s.serialize(o))
-
-class ArchiveError(Exception):
-    pass
-
-class Archive(object):
-    def __init__(self, root_tag=None, serializer=Serializer, indent=2):
-        self.root_tag = root_tag
-        self.serializer = serializer
-        self.indent = indent
-        self.formats = {'json': JsonArchive, 'xml': XMLArchive}
-        self.r = re.compile('^.+\.(\w+)$')
-
-    def dumpfile(self, o, filename):
-        a = self._archive_factory(filename)
-        a.dumpfile(o, filename)
-
-    def loadfile(self, filename):
-        a = self._archive_factory(filename)
-        return a.loadfile(filename)
-
-    def _archive_factory(self, filename):
-        m = self.r.match(filename)
-        if m is None or len(m.groups()) != 1:
-            raise ArchiveError('Cannot infer archive format form filename')
-        f = m.groups()[0]
-        if not self.formats.has_key(f):
-            raise ArchiveError('Unsupported archive format: {}'.format(f))
-        A = self.formats[f]
-        return A(self.root_tag, self.serializer, self.indent)
 
 class XMLArchiveError(Exception):
     pass
@@ -277,3 +249,57 @@ class JsonArchive(object):
             return o
         except ValueError as e:
             raise JsonArchiveError(e.message)
+
+class ArchiveError(Exception):
+    pass
+
+class Archive(object):
+    formats = ['json','xml']
+    classes = {'json': JsonArchive, 'xml': XMLArchive}
+
+    def __init__(self, basename, archive_name=None, serializer=Serializer, 
+                 indent=2, default_format='json'):
+        self.basename = basename
+        self.name = archive_name
+        self.default_format = default_format
+        self.serializer = serializer
+        self.indent = indent
+
+        self._f = self._infer_format()
+        self.filename = self.basename + '.' + self._f
+        self._a = self._archive_factory()
+
+    def save(self, o):
+        # TODO: parameter to force saving to a particular format, i.e. to
+        # convert from one format to the other
+        self._a.dumpfile(o, self.filename)
+
+    def load(self):
+        return self._a.loadfile(self.filename)
+
+    def _archive_factory(self):
+        if not self.classes.has_key(self._f):
+            raise ArchiveError('Unsupported archive format: {}'.format(self._f))
+        A = self.classes[self._f]
+        return A(self.name, self.serializer, self.indent)
+    
+    def _infer_format(self):
+        fs = []
+        for f in self.formats:
+            if os.path.exists(self.basename + '.' + f):
+                fs.append(f)
+        if len(fs) > 1:
+            raise ArchiveError('Found multiple files for archive "{}"'
+                               .format(self.basename))
+        elif len(fs) == 1:
+            return fs[0]
+        else:
+            return self.default_format
+
+def archive_exists(basename):
+    fs = []
+    for f in Archive.formats:
+        if os.path.exists(basename + '.' + f):
+            return True
+    return False
+
