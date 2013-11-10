@@ -8,7 +8,7 @@ _CONFIG_FILE='''\
 ; experiment_index = experiment.index
 ; measurement_file = measurement.${measurement_id}
 ; measurement_index = measurement.index
-; default_format = xml
+; default_format = json
 '''
 
 class Config(object):
@@ -27,7 +27,7 @@ class Config(object):
         self.experiment_index = 'experiment.index'
         self.measurement_file = 'measurement.${measurement_id}'
         self.measurement_index = 'measurement.index'
-        self.default_format = 'xml'
+        self.default_format = 'json'
 
         # load file, if it exists
         self.load()

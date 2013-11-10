@@ -108,8 +108,8 @@ class Experiment(object):
         
         self.eindex = None
         if archive_exists(self.config.experiment_index_path):
-            self.eindex = IndexFile(self.config.experiment_index_path, 
-                                    'experiment', config=self.config)
+            self.eindex = IndexFile(self.config.experiment_index_path, 'experiment', 
+                                    default_format=self.config.default_format)
 
         if not os.path.exists(self.dir):
             os.mkdir(self.dir)
@@ -118,7 +118,8 @@ class Experiment(object):
         # index file is created if it does not exist
         self.last_mid = 0
         mindexfile = os.path.join(self.dir,self.config.measurement_index)
-        self.mindex = IndexFile(mindexfile, 'measurement', config=self.config)
+        self.mindex = IndexFile(mindexfile, 'measurement', 
+                                default_format=self.config.default_format)
         self.last_mid = self.mindex.read()
 
         # Retrieve files matching the experiment_file config variable.
@@ -332,7 +333,7 @@ class Experiment(object):
         s = pattern
         s = s.replace('.','\.').replace('/','\/')
         fs = '|'.join(Archive.formats) # string 'json|xml', or similar
-        s = '^(' +  Template(s).substitute({sub: '(\d+)'}) + ')\.(?:' + fs + ')$'
+        s = '^(' +  Template(s).substitute({sub: '(\d+|none)'}) + ')\.(?:' + fs + ')$'
         e = re.compile(s)
 
         # All files in current directory that match
@@ -341,9 +342,9 @@ class Experiment(object):
         for f in fs:
             m  = e.match(f)
             if m is not None:
-                if len(m.groups()) == 2:
+                if len(m.groups()) == 2 and m.group(2) != 'none':
                     rs.append((int(m.group(2)),m.group(1)))
-                elif len(m.groups()) == 1:
+                else:
                     rs.append((0,m.group(1)))
         return rs
 

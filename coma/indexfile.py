@@ -3,7 +3,7 @@ from .serialization import Archive, archive_exists
 from .config import Config
 
 class IndexFile(object):
-    def __init__(self, indexfile, indextype, config=Config()):
+    def __init__(self, indexfile, indextype, default_format='json'):
         self.element = ''
         archive_name = ''
         if indextype == 'experiment':
@@ -12,7 +12,7 @@ class IndexFile(object):
         elif indextype == 'measurement':
             archive_name = 'measurements'
             self.element = 'last_measurement_id'
-        self.archive = Archive(indexfile, archive_name, default_format=config.default_format)
+        self.archive = Archive(indexfile, archive_name, default_format=default_format)
         if not archive_exists(indexfile):
             self.createfile()
 

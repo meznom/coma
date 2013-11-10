@@ -3,10 +3,11 @@ from collections import OrderedDict
 import os
 import shutil
 import copy
+import glob
 from coma import Measurement, Experiment, ExperimentError, Config, IndexFile, \
-                 ParameterSet, ResultList, Result
+                 ParameterSet, ResultList, Result, Archive
 
-_EXP_FILE_1='''\
+XML_FILE_1='''\
 <experiment>
   <info>
     <experiment_id>10</experiment_id>
@@ -15,7 +16,17 @@ _EXP_FILE_1='''\
 </experiment>
 '''
 
-_EXP_FILE_2='''\
+JSON_FILE_1='''\
+{
+  "experiment": {
+    "info": {
+      "experiment_id": 10,
+      "description": "Muh"
+    }
+  }
+}'''
+
+XML_FILE_2='''\
 <experiment>
   <info>
     <experiment_id>20</experiment_id>
@@ -23,6 +34,21 @@ _EXP_FILE_2='''\
   </info>
 </experiment>
 '''
+
+JSON_FILE_2='''\
+{
+  "experiment": {
+    "info": {
+      "experiment_id": 20,
+      "description": "Miau"
+    }
+  }
+}'''
+
+files = {
+    'xml': [XML_FILE_1,XML_FILE_2],
+    'json': [JSON_FILE_1,JSON_FILE_2]
+}
 
 class ExampleSimulation(object):
     def __init__(self):
@@ -54,8 +80,7 @@ class ExampleSimulation(object):
         i['results'] = self.results
         return i
 
-# TODO: test experiment with json files; json and xml mixed
-class TestExperiment(unittest.TestCase):
+class TestExperiment(object):
     def setUp(self):
         base_dir = os.path.dirname(__file__)
         self.d = os.path.join(base_dir, 'testexperiment')
@@ -65,30 +90,37 @@ class TestExperiment(unittest.TestCase):
             shutil.rmtree(self.d)
 
         os.mkdir(self.d)
-        i = IndexFile(self.fi, 'experiment')
+        i = IndexFile(self.fi, 'experiment', default_format=self.format)
         i.createfile()
         i.increment()
         i.increment()
 
         self.c = Config()
         self.c.experiment_index = self.fi
+        self.c.default_format = self.format
 
     def tearDown(self):
         if os.path.exists(self.d):
             shutil.rmtree(self.d)
 
+    def filename(self, basename):
+        return os.path.join(self.d, basename + '.' + self.format)
+
+    def exists(self, basename):
+        return os.path.exists(self.filename(basename))
+
     def test_create_experiment_with_id_in_name(self):
         # create a new experiment
         e = Experiment(self.d, description='Blub', config=self.c)
         
-        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000003.xml')))
+        self.assertTrue(self.exists('experiment.000003'))
         self.assertEquals(e.id, 3)
         self.assertEquals(e.description, 'Blub')
 
         # reopen the same experiment
         e = Experiment(self.d, config=self.c)
 
-        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000003.xml')))
+        self.assertTrue(self.exists('experiment.000003'))
         self.assertEquals(e.id, 3)
         self.assertEquals(e.description, 'Blub')
 
@@ -99,14 +131,14 @@ class TestExperiment(unittest.TestCase):
         # create a new experiment
         e = Experiment(self.d, description='Blub', config=c)
         
-        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.xml')))
+        self.assertTrue(self.exists('experiment'))
         self.assertEquals(e.id, 3)
         self.assertEquals(e.description, 'Blub')
 
         # reopen the same experiment
         e = Experiment(self.d, config=c)
 
-        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.xml')))
+        self.assertTrue(self.exists('experiment'))
         self.assertEquals(e.id, 3)
         self.assertEquals(e.description, 'Blub')
 
@@ -114,35 +146,42 @@ class TestExperiment(unittest.TestCase):
         # create a new experiment
         e = Experiment(self.d, id=42, description='Blub', config=self.c)
         
-        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000042.xml')))
+        self.assertTrue(self.exists('experiment.000042'))
         self.assertEquals(e.id, 42)
         self.assertEquals(e.description, 'Blub')
 
         # reopen the same experiment
         e = Experiment(self.d, config=self.c)
 
-        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000042.xml')))
+        self.assertTrue(self.exists('experiment.000042'))
         self.assertEquals(e.id, 42)
         self.assertEquals(e.description, 'Blub')
 
-    def test_create_experiment_without_index_file(self):
+    def test_create_experiment_without_index_file_1(self):
         c = copy.copy(self.c)
         c.experiment_index = '__experimenttest.index'
         
         e = Experiment(self.d,config=c)
         self.assertFalse(os.path.exists(c.experiment_index_path))
-        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.none.xml')))
+        self.assertTrue(self.exists('experiment.none'))
         self.assertEquals(e.id, None)
+
+        with self.assertRaises(ExperimentError):
+            Experiment(self.d,id=42,config=c)
+
+    def test_create_experiment_without_index_file_2(self):
+        c = copy.copy(self.c)
+        c.experiment_index = '__experimenttest.index'
 
         e = Experiment(self.d,id=42,config=c)
         self.assertFalse(os.path.exists(c.experiment_index_path))
-        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000042.xml')))
+        self.assertTrue(self.exists('experiment.000042'))
         self.assertEquals(e.id, 42)
 
     def test_load_experiment_with_id(self):
-        fn = os.path.join(self.d, 'experiment.000010.xml')
+        fn = self.filename('experiment.000010')
         f = open(fn, 'w')
-        f.write(_EXP_FILE_1)
+        f.write(files[self.format][0])
         f.close()
 
         e = Experiment(self.d, config=self.c)
@@ -153,9 +192,9 @@ class TestExperiment(unittest.TestCase):
         c = copy.copy(self.c)
         c.experiment_file = 'experiment'
 
-        fn = os.path.join(self.d, 'experiment.xml')
+        fn = self.filename('experiment')
         f = open(fn, 'w')
-        f.write(_EXP_FILE_1)
+        f.write(files[self.format][0])
         f.close()
 
         e = Experiment(self.d, config=c)
@@ -163,17 +202,17 @@ class TestExperiment(unittest.TestCase):
         self.assertEquals(e.description, 'Muh')
 
     def test_load_experiment_with_wrong_id(self):
-        fn = os.path.join(self.d, 'experiment.000010.xml')
+        fn = self.filename('experiment.000010')
         f = open(fn, 'w')
-        f.write(_EXP_FILE_2) # has id 20
+        f.write(files[self.format][1]) # has id 20
         f.close()
         with self.assertRaises(ExperimentError):
             e = Experiment(self.d, config=self.c)
         os.remove(fn)
         
-        fn = os.path.join(self.d, 'experiment.000020.xml')
+        fn = self.filename('experiment.000020')
         f = open(fn, 'w')
-        f.write(_EXP_FILE_2)
+        f.write(files[self.format][1])
         f.close()
         with self.assertRaises(ExperimentError):
             e = Experiment(self.d, id=42, config=self.c)
@@ -181,22 +220,22 @@ class TestExperiment(unittest.TestCase):
 
         c = copy.copy(self.c)
         c.experiment_file = 'experiment'
-        fn = os.path.join(self.d, 'experiment.xml')
+        fn = self.filename('experiment')
         f = open(fn, 'w')
-        f.write(_EXP_FILE_2)
+        f.write(files[self.format][1])
         f.close()
         with self.assertRaises(ExperimentError):
             e = Experiment(self.d, id=42, config=c)
         os.remove(fn)
 
     def test_load_experiment_with_multiple_experiment_files_in_directory(self):
-        fn = os.path.join(self.d, 'experiment.000010.xml')
+        fn = self.filename('experiment.000010')
         f = open(fn, 'w')
-        f.write(_EXP_FILE_1)
+        f.write(files[self.format][0])
         f.close()
-        fn = os.path.join(self.d, 'experiment.000020.xml')
+        fn = self.filename('experiment.000020')
         f = open(fn, 'w')
-        f.write(_EXP_FILE_2)
+        f.write(files[self.format][1])
         f.close()
 
         e = Experiment(self.d, id=20, config=self.c)
@@ -210,18 +249,58 @@ class TestExperiment(unittest.TestCase):
         with self.assertRaises(ExperimentError):
             e = Experiment(self.d, config=self.c)
 
+    def test_load_experiment_without_index_file_1(self):
+        c = copy.copy(self.c)
+        c.experiment_index = '__experimenttest.index'
+
+        fn = self.filename('experiment.000010')
+        f = open(fn, 'w')
+        f.write(files[self.format][0])
+        f.close()
+        
+        e = Experiment(self.d,config=c)
+        self.assertEquals(e.id, 10)
+        self.assertEquals(e.description, 'Muh')
+
+    def test_load_experiment_without_index_file_2(self):
+        c = copy.copy(self.c)
+        c.experiment_index = '__experimenttest.index'
+        c.experiment_file = 'experiment'
+        
+        fn = self.filename('experiment')
+        f = open(fn, 'w')
+        f.write(files[self.format][0])
+        f.close()
+        
+        e = Experiment(self.d,config=c)
+        self.assertEquals(e.id, 10)
+        self.assertEquals(e.description, 'Muh')
+    
+    def test_load_experiment_without_index_file_3(self):
+        c = copy.copy(self.c)
+        c.experiment_index = '__experimenttest.index'
+        
+        fn = self.filename('experiment.none')
+        f = open(fn, 'w')
+        f.write(files[self.format][0])
+        f.close()
+        
+        e = Experiment(self.d,config=c)
+        self.assertEquals(e.id, 10)
+        self.assertEquals(e.description, 'Muh')
+
     def test_load_experiment_with_wrong_filename(self):
         c = copy.copy(self.c)
         c.experiment_file = 'experiment'
-        fn = os.path.join(self.d, 'experiment.000010.xml')
+        fn = self.filename('experiment.000010')
         f = open(fn, 'w')
-        f.write(_EXP_FILE_1)
+        f.write(files[self.format][0])
         f.close()
 
         # creates a new experiment file
         e = Experiment(self.d, config=c)
-        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.xml')))
-        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000010.xml')))
+        self.assertTrue(self.exists('experiment'))
+        self.assertTrue(self.exists('experiment.000010'))
 
     def run_example_experiment_1(self, e, r=(0,10)):
         e.start()
@@ -241,8 +320,8 @@ class TestExperiment(unittest.TestCase):
         e = Experiment(self.d,config=self.c)
         
         self.assertTrue(os.path.exists(self.d))
-        self.assertTrue(os.path.exists(os.path.join(self.d, 'measurement.index.xml')))
-        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000003.xml')))
+        self.assertTrue(self.exists('measurement.index'))
+        self.assertTrue(self.exists('experiment.000003'))
 
         e.description = 'Test experiment'
         self.run_example_experiment_1(e)
@@ -250,6 +329,29 @@ class TestExperiment(unittest.TestCase):
         del(e)
         e = Experiment(self.d,config=self.c)
         self.assertEqual(e.id, 3)
+        self.assertEqual(e.description, 'Test experiment')
+        self.assertEqual(e.number_of_measurements(), 10)
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m['info/measurement_id'], i+1)
+            self.assertEqual(m['info/program'], 'ExampleSimulation')
+            self.assertEqual(m['parameters/a'], i)
+
+    def test_standalone_experiment_without_index_file(self):
+        c = copy.copy(self.c)
+        c.experiment_index = '__experimenttest.index'
+
+        e = Experiment(self.d,config=c)
+        
+        self.assertTrue(os.path.exists(self.d))
+        self.assertTrue(self.exists('measurement.index'))
+        self.assertTrue(self.exists('experiment.none'))
+
+        e.description = 'Test experiment'
+        self.run_example_experiment_1(e)
+
+        del(e)
+        e = Experiment(self.d,config=c)
+        self.assertEqual(e.id, None)
         self.assertEqual(e.description, 'Test experiment')
         self.assertEqual(e.number_of_measurements(), 10)
         for i,m in enumerate(e.measurements()):
@@ -298,7 +400,7 @@ class TestExperiment(unittest.TestCase):
         e = Experiment(self.d, config=c)
         self.run_example_experiment_1(e)
 
-        self.assertTrue(os.path.exists(os.path.join(self.d, '000001.xml')))
+        self.assertTrue(self.exists('000001'))
         self.assertEqual(e.number_of_measurements(), 10)
         for i,m in enumerate(e.measurements()):
             self.assertEqual(m['parameters/a'], i)
@@ -310,7 +412,7 @@ class TestExperiment(unittest.TestCase):
         e = Experiment(self.d, config=c)
         self.run_example_experiment_1(e)
 
-        self.assertTrue(os.path.exists(os.path.join(self.d, 'blah.xml')))
+        self.assertTrue(self.exists('blah'))
         self.assertEqual(e.number_of_measurements(), 1)
 
     def test_continuing_measurements_in_experiment(self):
@@ -349,8 +451,8 @@ class TestExperiment(unittest.TestCase):
         e = Experiment(self.d,config=self.c)
         self.run_example_experiment_1(e)
 
-        f1 = os.path.join(self.d, 'measurement.000001.xml')
-        f2 = os.path.join(self.d, 'measurement.000007.xml')
+        f1 = self.filename('measurement.000001')
+        f2 = self.filename('measurement.000007')
         self.assertTrue(os.path.exists(f1))
         self.assertTrue(os.path.exists(f2))
         os.remove(f1)
@@ -521,8 +623,8 @@ class TestExperiment(unittest.TestCase):
                 e.add_parameter_set(t,V1)
 
         # delete some existing measurements
-        f1 = os.path.join(self.d, 'measurement.000011.xml')
-        f2 = os.path.join(self.d, 'measurement.000042.xml')
+        f1 = self.filename('measurement.000011')
+        f2 = self.filename('measurement.000042')
         self.assertTrue(os.path.exists(f1))
         self.assertTrue(os.path.exists(f2))
         os.remove(f1)
@@ -830,3 +932,134 @@ class TestExperiment(unittest.TestCase):
         rs = e.retrieve_results(tdef)
         self.assertEqual(rs[0].table.shape, (100,4))
         #print(rs[0].table)
+
+class TestExperimentXML(TestExperiment,unittest.TestCase):
+    def __init__(self, method='runTest'):
+        super(TestExperimentXML, self).__init__(method)
+        self.format = 'xml'
+
+class TestExperimentJson(TestExperiment,unittest.TestCase):
+    def __init__(self, method='runTest'):
+        super(TestExperimentJson, self).__init__(method)
+        self.format = 'json'
+
+class TestExperimentXMLAndJsonMixed(unittest.TestCase):
+    def setUp(self):
+        base_dir = os.path.dirname(__file__)
+        self.d = os.path.join(base_dir, 'testexperiment')
+        self.fi = os.path.join(self.d, 'coma.index')
+        
+        if os.path.exists(self.d):
+            shutil.rmtree(self.d)
+
+        os.mkdir(self.d)
+
+    def tearDown(self):
+        if os.path.exists(self.d):
+            shutil.rmtree(self.d)
+
+    def test_default_format_is_json(self):
+        i = IndexFile(self.fi, 'experiment')
+        i.createfile()
+
+        c = Config()
+        c.experiment_index = self.fi
+        
+        e = Experiment(self.d, description='Blub', config=c)
+        
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'coma.index.json')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000001.json')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'measurement.index.json')))
+        self.assertEquals(e.id, 1)
+        self.assertEquals(e.description, 'Blub')
+
+        # reopen the same experiment
+        e = Experiment(self.d, config=c)
+
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'coma.index.json')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000001.json')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'measurement.index.json')))
+        self.assertEquals(e.id, 1)
+        self.assertEquals(e.description, 'Blub')
+
+    def test_can_use_xml_format(self):
+        i = IndexFile(self.fi, 'experiment', default_format='xml')
+        i.createfile()
+
+        c = Config()
+        c.experiment_index = self.fi
+        c.default_format = 'xml'
+        
+        e = Experiment(self.d, description='Blub', config=c)
+        
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'coma.index.xml')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000001.xml')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'measurement.index.xml')))
+        self.assertEquals(e.id, 1)
+        self.assertEquals(e.description, 'Blub')
+
+        # reopen the same experiment
+        e = Experiment(self.d, config=c)
+
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'coma.index.xml')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.000001.xml')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'measurement.index.xml')))
+        self.assertEquals(e.id, 1)
+        self.assertEquals(e.description, 'Blub')
+
+    def run_example_experiment_xml_and_json(self, e, r=(0,10)):
+        e.start()
+        s = ExampleSimulation()
+        for i in range(*r):
+            m = e.new_measurement()
+            m.start()
+            s.a = i
+            s.init()
+            s.run()
+            m.end()
+            m.save(s)
+        e.end()
+        e.save()
+
+        j = 0
+        fs = glob.glob(os.path.join(self.d, 'measurement.*.json'))
+        fs.sort()
+        for f in fs[:-1]:
+            j += 1
+            if j%2 == 0:
+                continue
+            a = Archive(f[:-5], 'measurement')
+            o = a.load()
+            os.remove(f)
+            a = Archive(f[:-5], 'measurement', default_format='xml')
+            a.save(o)
+    
+    def test_load_experiment_with_xml_and_json_files(self):
+        c = Config()
+        c.experiment_index = self.fi
+        
+        e = Experiment(self.d,config=c)
+        
+        self.assertTrue(os.path.exists(self.d))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'measurement.index.json')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'experiment.none.json')))
+
+        e.description = 'Test experiment'
+        self.run_example_experiment_xml_and_json(e,(0,6))
+
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'measurement.000001.xml')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'measurement.000002.json')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'measurement.000003.xml')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'measurement.000004.json')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'measurement.000005.xml')))
+        self.assertTrue(os.path.exists(os.path.join(self.d, 'measurement.000006.json')))
+
+        del(e)
+        e = Experiment(self.d,config=c)
+        self.assertEqual(e.id, None)
+        self.assertEqual(e.description, 'Test experiment')
+        self.assertEqual(e.number_of_measurements(), 6)
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m['info/measurement_id'], i+1)
+            self.assertEqual(m['info/program'], 'ExampleSimulation')
+            self.assertEqual(m['parameters/a'], i)

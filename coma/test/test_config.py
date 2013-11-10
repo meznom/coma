@@ -15,7 +15,7 @@ experiment_file = experiment.readme
 experiment_index = ~/experiments.index
 measurement_file = ${measurement_id}
 measurement_index = measurements.index
-default_format = json
+default_format = xml
 '''
 
 class TestConfig(unittest.TestCase):
@@ -27,7 +27,7 @@ class TestConfig(unittest.TestCase):
                          os.path.expanduser('~/.config/coma/preferences.conf'))
         self.assertEqual(c.experiment_index_path, 
                          os.path.expanduser('~/.config/coma/experiment.index'))
-        self.assertEqual(c.default_format, 'xml')
+        self.assertEqual(c.default_format, 'json')
         
     def test_expands_paths_correctly(self):
         open('__pref.conf', 'w').close()
@@ -82,7 +82,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(c.experiment_index, 'quark')
         self.assertEqual(c.experiment_index_path, 
                          os.path.expanduser('~/.config/coma/quark'))
-        self.assertEqual(c.default_format, 'xml')
+        self.assertEqual(c.default_format, 'json')
 
         c.configfile = '__pref2.conf'
         c.load()
@@ -92,7 +92,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(c.measurement_index, 'measurements.index')
         self.assertEqual(c.experiment_index_path, 
                          os.path.expanduser('~/experiments.index'))
-        self.assertEqual(c.default_format, 'json')
+        self.assertEqual(c.default_format, 'xml')
         
         os.remove('__pref1.conf')
         os.remove('__pref2.conf')
