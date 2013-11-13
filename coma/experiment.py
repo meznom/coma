@@ -7,7 +7,7 @@ from .serialization import Archive, archive_exists
 from .util import current_date_as_string
 from .indexfile import IndexFile
 from .config import Config
-from .measurement import Measurement
+from .measurement import FileMeasurement, MemoryMeasurement
 
 class ExperimentError(Exception):
     pass
@@ -115,30 +115,32 @@ class Experiment(object):
             os.mkdir(self.dir)
 
         # Measurements
-        # index file is created if it does not exist
+        self._measurements = None
         self.last_mid = 0
-        mindexfile = os.path.join(self.dir,self.config.measurement_index)
-        self.mindex = IndexFile(mindexfile, 'measurement', 
-                                default_format=self.config.default_format)
-        self.last_mid = self.mindex.read()
+        self.mindex = None
 
         # Retrieve files matching the experiment_file config variable.
         #
         # If there are no matching files, we create a new experiment, using the
         # supplied experiment id or retrieving the id from the global counter
-        # (stored in the config directory).
+        # (stored in the config directory). Creates a new measurement index
+        # file.
         #
         # If there is one matching file, then we load this experiment, if the
-        # filename contains the experiment id, then we retrieve it.
+        # filename contains the experiment id, then we retrieve it. Loads the
+        # measurement index file, if it exists.
         #
         # If there are multiple matching files, then we load the one matching
-        # the provided experiment id. 
+        # the provided experiment id. Never loads a measurement index file.
+        mindexfile = os.path.join(self.dir,self.config.measurement_index)
         fs = self._matching_experiment_files()
         if len(fs) == 0:
             if self.id is None and self.eindex is not None:
                 self.id = self.eindex.increment()
             f = os.path.join(self.dir,self._experiment_filename())
             self.archive = Archive(f, 'experiment', default_format=self.config.default_format)
+            self.mindex = IndexFile(mindexfile, 'measurement', 
+                                    default_format=self.config.default_format)
             self.save()
             self.load()
         elif len(fs) == 1:
@@ -146,8 +148,11 @@ class Experiment(object):
                 self.id = fs[0][0]
             f = os.path.join(self.dir, fs[0][1])
             self.archive = Archive(f, 'experiment', default_format=self.config.default_format)
+            if archive_exists(mindexfile):
+                self.mindex = IndexFile(mindexfile, 'measurement', 
+                                        default_format=self.config.default_format)
             self.load()
-        elif len(fs) > 1:
+        else:
             d = dict(fs)
             if self.id is None or not d.has_key(self.id):
                 raise ExperimentError('Found multiple experiment files, non of ' +
@@ -157,27 +162,29 @@ class Experiment(object):
             self.load()
 
     def save(self):
-        i = OrderedDict([
-            ('info', OrderedDict([
+        o = OrderedDict()
+        o['info'] = OrderedDict([
                         ('experiment_id', self.id),
                         ('description', self.description),
                         ('tags', self.tags),
                         ('start_date', self.start_date),
-                        ('end_date', self.end_date)]))
-            ])
+                        ('end_date', self.end_date)])
+        if self._measurements is not None:
+            o['measurements'] = self._measurements
+
         f = self.archive.filename
         backupfile = f + '.backup'
         if os.path.exists(f):
             os.rename(f, backupfile)
 
-        self.archive.save(i)
+        self.archive.save(o)
         
         if os.path.exists(backupfile):
             os.remove(backupfile)
 
     def load(self):
-        i = self.archive.load()
-        i = i['info']
+        o = self.archive.load()
+        i = o['info']
 
         if self.id is not None and str(self.id) != str(i['experiment_id']):
             raise ExperimentError('Trying to load experiment "{}" from file "{}", '
@@ -189,43 +196,73 @@ class Experiment(object):
             if i.has_key(k):
                 self.__setattr__(k, i[k])
 
-        self.last_mid = self.mindex.read()
+        self._measurements = None
+        self.last_mid = 0
+        if o.has_key('measurements'):
+            self._measurements = o['measurements']
+        elif self.mindex is not None:
+            self.last_mid = self.mindex.read()
+
+    def deactivate(self):
+        if not self.isactive():
+            raise ExperimentError('Experiment already is inactive')
+        self._measurements = []
+        for m in self.measurements():
+            self._measurements.append(m.data)
+        self.save()
+        # TODO: read back and verify everything got written correctly
+
+    def isactive(self):
+        return self._measurements is None
 
     def start(self):
         self.start_date = current_date_as_string()
 
-    def end (self):
+    def end(self):
         self.end_date = current_date_as_string()
 
     def reset(self):
-        self.mindex.createfile()
-        self.last_mid = self.mindex.read()
-        for _,f in self._matching_measurement_files():
-            f = os.path.join(self.dir, f)
-            # TODO: maybe move functionality to archive, i.e. a method
-            # Archive.delete
-            a = Archive(f)
-            os.remove(a.filename)
+        self.start_date = None
+        self.end_date = None
+        if self.isactive():
+            self.mindex.createfile()
+            self.last_mid = self.mindex.read()
+            for _,f in self._matching_measurement_files():
+                f = os.path.join(self.dir, f)
+                a = Archive(f)
+                os.remove(a.filename)
+        else:
+            self._measurements = []
+        self.save()
 
     def new_measurement(self):
+        if not self.isactive():
+            return None
         mid = self.mindex.increment()
         f = self._measurement_filename(mid)
         f = os.path.join(self.dir, f)
-        m = Measurement(f, mid, config=self.config)
+        m = FileMeasurement(f, mid, config=self.config)
         self.last_mid = mid
         return m
 
     def measurements(self):
-        for mid in range(1,self.last_mid+1):
-            f = self._measurement_filename(mid)
-            f = os.path.join(self.dir, f)
-            if archive_exists(f):
-                yield Measurement(f, mid, config=self.config)
-            else:
-                continue
+        if self.isactive():
+            for mid in range(1,self.last_mid+1):
+                f = self._measurement_filename(mid)
+                f = os.path.join(self.dir, f)
+                if archive_exists(f):
+                    yield FileMeasurement(f, mid, config=self.config)
+                else:
+                    continue
+        else:
+            for m in self._measurements:
+                yield MemoryMeasurement(m)
 
     def number_of_measurements(self):
-        return len(self._matching_measurement_files())
+        if self.isactive():
+            return len(self._matching_measurement_files())
+        else:
+            return len(self._measurements)
 
     def define_parameter_set(self, *args):
         self.pset_definition = OrderedDict(args)

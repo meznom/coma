@@ -6,7 +6,7 @@ except ImportError:
     pass
 
 from .experiment import Experiment, ExperimentError, ParameterSet, Result, ResultList
-from .measurement import Measurement
+from .measurement import FileMeasurement, MemoryMeasurement
 from .serialization import XMLArchive, XMLArchiveError, JsonArchive, \
                            JsonArchiveError, Serializer, Restorer, Archive, \
                            ArchiveError, archive_exists

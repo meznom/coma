@@ -29,7 +29,59 @@ class DictAsObject(object):
              return a
 
 class Measurement(object):
+    def __init__(self):
+        self.id = None
+        self.start_date = None
+        self.end_date = None
+        self.data = {}
+
+    def __getitem__(self, i):
+        return access_data_by_path(self.data, i)
+
+    def __str__(self):
+        s = 'Measurement {}'.format(self.id)
+        if self.data.has_key('info'):
+            i = self.data['info']
+            keys = ['program', 'version', 'start_date', 'end_date']
+            for k in keys:
+                if i.has_key(k) and i[k]:
+                    s += '\n  {}: {}'.format(k,i[k])
+        s += '\n  Fields: {}\n'.format(self.data.keys())
+        return s
+
+    # This is experimental, a convenience method for accessing the data
+    # dictionary like an object: E.g. m.data['parameters']['layout']['V1']
+    # should be accessible as m.parameters.layout.V1 (where m is an instance of
+    # Measurement)
+    def __getattr__(self, name):
+        if not self.data.has_key(name):
+            raise AttributeError()
+        if isinstance(self.data[name], dict):
+            return DictAsObject(self.data[name])
+        else:
+            return self.data[name]
+
+class MemoryMeasurement(Measurement):
+    def __init__(self, data):
+        Measurement.__init__(self)
+        self.data = data
+        i = OrderedDict([
+            ('measurement_id', self.id),
+            ('start_date', self.start_date),
+            ('end_date',self.end_date)])
+        
+        if not self.data.has_key('info'):
+            self.data = OrderedDict([('info', i)] + self.data.items())
+        else:
+            i.update(self.data['info'])
+            self.data['info'] = i
+            self.id = i['measurement_id']
+            self.start_date = i['start_date']
+            self.end_date = i['end_date']
+
+class FileMeasurement(Measurement):
     def __init__(self, filename, id=None, config=Config()):
+        Measurement.__init__(self)
         self.id = id
         self.start_date = None
         self.end_date = None
@@ -76,32 +128,3 @@ class Measurement(object):
         for k in ks:
             if i.has_key(k):
                 self.__setattr__(k, i[k])
-
-    def __iter__(self):
-        return self.data.itervalues()
-
-    def __getitem__(self, i):
-        return access_data_by_path(self.data, i)
-
-    def __str__(self):
-        s = 'Measurement {}'.format(self.id)
-        if self.data.has_key('info'):
-            i = self.data['info']
-            keys = ['program', 'version', 'start_date', 'end_date']
-            for k in keys:
-                if i.has_key(k) and i[k]:
-                    s += '\n  {}: {}'.format(k,i[k])
-        s += '\n  Fields: {}\n'.format(self.data.keys())
-        return s
-
-    # This is experimental, a convenience method for accessing the data
-    # dictionary like an object: E.g. m.data['parameters']['layout']['V1']
-    # should be accessible as m.parameters.layout.V1 (where m is an instance of
-    # Measurement)
-    def __getattr__(self, name):
-        if not self.data.has_key(name):
-            raise AttributeError()
-        if isinstance(self.data[name], dict):
-            return DictAsObject(self.data[name])
-        else:
-            return self.data[name]

@@ -4,7 +4,7 @@ import os
 import shutil
 import copy
 import glob
-from coma import Measurement, Experiment, ExperimentError, Config, IndexFile, \
+from coma import Experiment, ExperimentError, Config, IndexFile, \
                  ParameterSet, ResultList, Result, Archive
 
 XML_FILE_1='''\
