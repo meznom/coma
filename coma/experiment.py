@@ -217,6 +217,7 @@ class Experiment(object):
         self.save()
 
         # Read back and verify everything got written correctly.
+        # TODO: do a self.load() first
         equal = True
         if self._number_of_file_measurements() != self._number_of_memory_measurements():
             equal = False
