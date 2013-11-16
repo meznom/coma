@@ -92,6 +92,10 @@ class ParameterSet(object):
         s += ')'
         return s
 
+# TODO: internal state of Experiment is quite complex (e.g. active / inactive,
+# index file, no index file, etc) and I need to keep track of it in several
+# methods; maybe try to simplify this (e.g. abstract access to mindex)
+
 class Experiment(object):
     def __init__(self, dir, id=None, description=None, tags=[], config=Config()):
         self.dir = dir
@@ -206,11 +210,28 @@ class Experiment(object):
     def deactivate(self):
         if not self.isactive():
             raise ExperimentError('Experiment already is inactive')
-        self._measurements = []
-        for m in self.measurements():
-            self._measurements.append(m.data)
+        ms = []
+        for m in self._file_measurements():
+            ms.append(m.data)
+        self._measurements = ms
         self.save()
-        # TODO: read back and verify everything got written correctly
+
+        # Read back and verify everything got written correctly.
+        equal = True
+        if self._number_of_file_measurements() != self._number_of_memory_measurements():
+            equal = False
+        for m1,m2 in zip(self._file_measurements(), self._memory_measurements()):
+            if m1.data != m2.data:
+                equal = False
+        if not equal:
+            raise ExperimentError('Could not deactivate experiment')
+
+        # TODO: what happens if mindex is None to start with?
+        for m in self._file_measurements():
+            os.remove(m.archive.filename)
+        os.remove(self.mindex.archive.filename)
+        self.mindex = None
+        self.last_mid = 0
 
     def isactive(self):
         return self._measurements is None
@@ -225,6 +246,7 @@ class Experiment(object):
         self.start_date = None
         self.end_date = None
         if self.isactive():
+            # TODO: delete only filenames with matching ids (i.e. not all matching files)
             self.mindex.createfile()
             self.last_mid = self.mindex.read()
             for _,f in self._matching_measurement_files():
@@ -247,22 +269,36 @@ class Experiment(object):
 
     def measurements(self):
         if self.isactive():
-            for mid in range(1,self.last_mid+1):
-                f = self._measurement_filename(mid)
-                f = os.path.join(self.dir, f)
-                if archive_exists(f):
-                    yield FileMeasurement(f, mid, config=self.config)
-                else:
-                    continue
+            return self._file_measurements()
         else:
-            for m in self._measurements:
-                yield MemoryMeasurement(m)
+            return self._memory_measurements()
+
+    def _file_measurements(self):
+        for mid in range(1,self.last_mid+1):
+            f = self._measurement_filename(mid)
+            f = os.path.join(self.dir, f)
+            if archive_exists(f):
+                yield FileMeasurement(f, mid, config=self.config)
+            else:
+                continue
+
+    def _memory_measurements(self):
+        for m in self._measurements:
+            yield MemoryMeasurement(m)
 
     def number_of_measurements(self):
         if self.isactive():
-            return len(self._matching_measurement_files())
+            return self._number_of_file_measurements()
         else:
-            return len(self._measurements)
+            return self._number_of_memory_measurements()
+
+    def _number_of_file_measurements(self):
+        fs = self._matching_measurement_files()
+        ls = [(1 if (mid!=0 and mid<=self.last_mid) else 0) for mid,f in fs]
+        return sum(ls)
+
+    def _number_of_memory_measurements(self):
+        return len(self._measurements)
 
     def define_parameter_set(self, *args):
         self.pset_definition = OrderedDict(args)

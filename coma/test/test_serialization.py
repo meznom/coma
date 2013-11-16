@@ -549,8 +549,8 @@ class TestArchive(unittest.TestCase):
         self.assertTrue(os.path.exists(f1))
         self.assertTrue(os.path.exists(f2))
 
-        self.assertTrue(filecmp.cmp(f1, f1_ref))
-        self.assertTrue(filecmp.cmp(f2, f2_ref))
+        self.assertTrue(filecmp.cmp(f1, f1_ref, shallow=False))
+        self.assertTrue(filecmp.cmp(f2, f2_ref, shallow=False))
 
         for f in [f1,f2,f1_ref,f2_ref]:
             os.remove(f)

@@ -4,6 +4,7 @@ import os
 import shutil
 import copy
 import glob
+import filecmp
 from coma import Experiment, ExperimentError, Config, IndexFile, \
                  ParameterSet, ResultList, Result, Archive
 
@@ -45,9 +46,483 @@ JSON_FILE_2='''\
   }
 }'''
 
+XML_FILE_3='''\
+<experiment>
+  <info>
+    <experiment_id>30</experiment_id>
+    <description>Test experiment</description>
+    <tags>
+      <count>0</count>
+      <item_version>0</item_version>
+    </tags>
+    <start_date/>
+    <end_date/>
+  </info>
+  <measurements>
+    <count>10</count>
+    <item_version>0</item_version>
+    <item>
+      <info>
+        <measurement_id>1</measurement_id>
+        <start_date/>
+        <end_date/>
+        <program>ExampleSimulation</program>
+        <version>0.1</version>
+      </info>
+      <parameters>
+        <a>0</a>
+        <t>2</t>
+        <layout>
+          <V1>100</V1>
+          <boa>2.2</boa>
+          <N/>
+        </layout>
+      </parameters>
+      <results>
+        <E>0</E>
+      </results>
+      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+    </item>
+    <item>
+      <info>
+        <measurement_id>2</measurement_id>
+        <start_date/>
+        <end_date/>
+        <program>ExampleSimulation</program>
+        <version>0.1</version>
+      </info>
+      <parameters>
+        <a>1</a>
+        <t>2</t>
+        <layout>
+          <V1>100</V1>
+          <boa>2.2</boa>
+          <N/>
+        </layout>
+      </parameters>
+      <results>
+        <E>1</E>
+      </results>
+      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+    </item>
+    <item>
+      <info>
+        <measurement_id>3</measurement_id>
+        <start_date/>
+        <end_date/>
+        <program>ExampleSimulation</program>
+        <version>0.1</version>
+      </info>
+      <parameters>
+        <a>2</a>
+        <t>2</t>
+        <layout>
+          <V1>100</V1>
+          <boa>2.2</boa>
+          <N/>
+        </layout>
+      </parameters>
+      <results>
+        <E>2</E>
+      </results>
+      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+    </item>
+    <item>
+      <info>
+        <measurement_id>4</measurement_id>
+        <start_date/>
+        <end_date/>
+        <program>ExampleSimulation</program>
+        <version>0.1</version>
+      </info>
+      <parameters>
+        <a>3</a>
+        <t>2</t>
+        <layout>
+          <V1>100</V1>
+          <boa>2.2</boa>
+          <N/>
+        </layout>
+      </parameters>
+      <results>
+        <E>3</E>
+      </results>
+      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+    </item>
+    <item>
+      <info>
+        <measurement_id>5</measurement_id>
+        <start_date/>
+        <end_date/>
+        <program>ExampleSimulation</program>
+        <version>0.1</version>
+      </info>
+      <parameters>
+        <a>4</a>
+        <t>2</t>
+        <layout>
+          <V1>100</V1>
+          <boa>2.2</boa>
+          <N/>
+        </layout>
+      </parameters>
+      <results>
+        <E>4</E>
+      </results>
+      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+    </item>
+    <item>
+      <info>
+        <measurement_id>6</measurement_id>
+        <start_date/>
+        <end_date/>
+        <program>ExampleSimulation</program>
+        <version>0.1</version>
+      </info>
+      <parameters>
+        <a>5</a>
+        <t>2</t>
+        <layout>
+          <V1>100</V1>
+          <boa>2.2</boa>
+          <N/>
+        </layout>
+      </parameters>
+      <results>
+        <E>5</E>
+      </results>
+      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+    </item>
+    <item>
+      <info>
+        <measurement_id>7</measurement_id>
+        <start_date/>
+        <end_date/>
+        <program>ExampleSimulation</program>
+        <version>0.1</version>
+      </info>
+      <parameters>
+        <a>6</a>
+        <t>2</t>
+        <layout>
+          <V1>100</V1>
+          <boa>2.2</boa>
+          <N/>
+        </layout>
+      </parameters>
+      <results>
+        <E>6</E>
+      </results>
+      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+    </item>
+    <item>
+      <info>
+        <measurement_id>8</measurement_id>
+        <start_date/>
+        <end_date/>
+        <program>ExampleSimulation</program>
+        <version>0.1</version>
+      </info>
+      <parameters>
+        <a>7</a>
+        <t>2</t>
+        <layout>
+          <V1>100</V1>
+          <boa>2.2</boa>
+          <N/>
+        </layout>
+      </parameters>
+      <results>
+        <E>7</E>
+      </results>
+      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+    </item>
+    <item>
+      <info>
+        <measurement_id>9</measurement_id>
+        <start_date/>
+        <end_date/>
+        <program>ExampleSimulation</program>
+        <version>0.1</version>
+      </info>
+      <parameters>
+        <a>8</a>
+        <t>2</t>
+        <layout>
+          <V1>100</V1>
+          <boa>2.2</boa>
+          <N/>
+        </layout>
+      </parameters>
+      <results>
+        <E>8</E>
+      </results>
+      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+    </item>
+    <item>
+      <info>
+        <measurement_id>10</measurement_id>
+        <start_date/>
+        <end_date/>
+        <program>ExampleSimulation</program>
+        <version>0.1</version>
+      </info>
+      <parameters>
+        <a>9</a>
+        <t>2</t>
+        <layout>
+          <V1>100</V1>
+          <boa>2.2</boa>
+          <N/>
+        </layout>
+      </parameters>
+      <results>
+        <E>9</E>
+      </results>
+      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+    </item>
+  </measurements>
+</experiment>
+'''
+
+JSON_FILE_3='''\
+{
+  "experiment": {
+    "info": {
+      "experiment_id": 30,
+      "description": "Test experiment",
+      "tags": [],
+      "start_date": null,
+      "end_date": null
+    },
+    "measurements": [
+      {
+        "info": {
+          "measurement_id": 1,
+          "start_date": null,
+          "end_date": null,
+          "program": "ExampleSimulation",
+          "version": 0.1
+        },
+        "parameters": {
+          "a": 0,
+          "t": 2,
+          "layout": {
+            "V1": 100,
+            "boa": 2.2,
+            "N": null
+          }
+        },
+        "results": {
+          "E": 0
+        },
+        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+      },
+      {
+        "info": {
+          "measurement_id": 2,
+          "start_date": null,
+          "end_date": null,
+          "program": "ExampleSimulation",
+          "version": 0.1
+        },
+        "parameters": {
+          "a": 1,
+          "t": 2,
+          "layout": {
+            "V1": 100,
+            "boa": 2.2,
+            "N": null
+          }
+        },
+        "results": {
+          "E": 1
+        },
+        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+      },
+      {
+        "info": {
+          "measurement_id": 3,
+          "start_date": null,
+          "end_date": null,
+          "program": "ExampleSimulation",
+          "version": 0.1
+        },
+        "parameters": {
+          "a": 2,
+          "t": 2,
+          "layout": {
+            "V1": 100,
+            "boa": 2.2,
+            "N": null
+          }
+        },
+        "results": {
+          "E": 2
+        },
+        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+      },
+      {
+        "info": {
+          "measurement_id": 4,
+          "start_date": null,
+          "end_date": null,
+          "program": "ExampleSimulation",
+          "version": 0.1
+        },
+        "parameters": {
+          "a": 3,
+          "t": 2,
+          "layout": {
+            "V1": 100,
+            "boa": 2.2,
+            "N": null
+          }
+        },
+        "results": {
+          "E": 3
+        },
+        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+      },
+      {
+        "info": {
+          "measurement_id": 5,
+          "start_date": null,
+          "end_date": null,
+          "program": "ExampleSimulation",
+          "version": 0.1
+        },
+        "parameters": {
+          "a": 4,
+          "t": 2,
+          "layout": {
+            "V1": 100,
+            "boa": 2.2,
+            "N": null
+          }
+        },
+        "results": {
+          "E": 4
+        },
+        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+      },
+      {
+        "info": {
+          "measurement_id": 6,
+          "start_date": null,
+          "end_date": null,
+          "program": "ExampleSimulation",
+          "version": 0.1
+        },
+        "parameters": {
+          "a": 5,
+          "t": 2,
+          "layout": {
+            "V1": 100,
+            "boa": 2.2,
+            "N": null
+          }
+        },
+        "results": {
+          "E": 5
+        },
+        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+      },
+      {
+        "info": {
+          "measurement_id": 7,
+          "start_date": null,
+          "end_date": null,
+          "program": "ExampleSimulation",
+          "version": 0.1
+        },
+        "parameters": {
+          "a": 6,
+          "t": 2,
+          "layout": {
+            "V1": 100,
+            "boa": 2.2,
+            "N": null
+          }
+        },
+        "results": {
+          "E": 6
+        },
+        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+      },
+      {
+        "info": {
+          "measurement_id": 8,
+          "start_date": null,
+          "end_date": null,
+          "program": "ExampleSimulation",
+          "version": 0.1
+        },
+        "parameters": {
+          "a": 7,
+          "t": 2,
+          "layout": {
+            "V1": 100,
+            "boa": 2.2,
+            "N": null
+          }
+        },
+        "results": {
+          "E": 7
+        },
+        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+      },
+      {
+        "info": {
+          "measurement_id": 9,
+          "start_date": null,
+          "end_date": null,
+          "program": "ExampleSimulation",
+          "version": 0.1
+        },
+        "parameters": {
+          "a": 8,
+          "t": 2,
+          "layout": {
+            "V1": 100,
+            "boa": 2.2,
+            "N": null
+          }
+        },
+        "results": {
+          "E": 8
+        },
+        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+      },
+      {
+        "info": {
+          "measurement_id": 10,
+          "start_date": null,
+          "end_date": null,
+          "program": "ExampleSimulation",
+          "version": 0.1
+        },
+        "parameters": {
+          "a": 9,
+          "t": 2,
+          "layout": {
+            "V1": 100,
+            "boa": 2.2,
+            "N": null
+          }
+        },
+        "results": {
+          "E": 9
+        },
+        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+      }
+    ]
+  }
+}'''
+
 files = {
-    'xml': [XML_FILE_1,XML_FILE_2],
-    'json': [JSON_FILE_1,JSON_FILE_2]
+    'xml': [XML_FILE_1,XML_FILE_2,XML_FILE_3],
+    'json': [JSON_FILE_1,JSON_FILE_2,JSON_FILE_3]
 }
 
 class ExampleSimulation(object):
@@ -79,6 +554,8 @@ class ExampleSimulation(object):
         i['parameters']['layout']['N'] = self.N
         i['results'] = self.results
         return i
+
+# TODO: test resetting an inactive experiment, test reset when an index file does not exist
 
 class TestExperiment(object):
     def setUp(self):
@@ -302,18 +779,56 @@ class TestExperiment(object):
         self.assertTrue(self.exists('experiment'))
         self.assertTrue(self.exists('experiment.000010'))
 
+    def test_load_inactive_experiment_with_id(self):
+        fn = self.filename('experiment.000030')
+        f = open(fn, 'w')
+        f.write(files[self.format][2])
+        f.close()
+
+        e = Experiment(self.d, config=self.c)
+        self.assertFalse(e.isactive())
+        self.assertEquals(e.id, 30)
+        self.assertEquals(e.description, 'Test experiment')
+        self.assertEqual(e.number_of_measurements(), 10)
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m['info/measurement_id'], i+1)
+            self.assertEqual(m['info/program'], 'ExampleSimulation')
+            self.assertEqual(m['info/version'], 0.1)
+            self.assertEqual(m['parameters/layout/V1'], 100)
+            self.assertEqual(m['parameters/a'], i)
+            self.assertEqual(m['results/E'], i)
+
+    def test_load_inactive_experiment_without_id(self):
+        c = copy.copy(self.c)
+        c.experiment_file = 'experiment'
+
+        fn = self.filename('experiment')
+        f = open(fn, 'w')
+        f.write(files[self.format][2])
+        f.close()
+
+        e = Experiment(self.d, config=c)
+        self.assertFalse(e.isactive())
+        self.assertEquals(e.id, 30)
+        self.assertEquals(e.description, 'Test experiment')
+        self.assertEqual(e.number_of_measurements(), 10)
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m['info/measurement_id'], i+1)
+            self.assertEqual(m['info/program'], 'ExampleSimulation')
+            self.assertEqual(m['info/version'], 0.1)
+            self.assertEqual(m['parameters/layout/V1'], 100)
+            self.assertEqual(m['parameters/a'], i)
+            self.assertEqual(m['results/E'], i)
+
     def run_example_experiment_1(self, e, r=(0,10)):
-        e.start()
         s = ExampleSimulation()
         for i in range(*r):
             m = e.new_measurement()
-            m.start()
             s.a = i
             s.init()
             s.run()
-            m.end()
+            s.results['E'] = i
             m.save(s)
-        e.end()
         e.save()
     
     def test_standalone_experiment(self):
@@ -334,7 +849,10 @@ class TestExperiment(object):
         for i,m in enumerate(e.measurements()):
             self.assertEqual(m['info/measurement_id'], i+1)
             self.assertEqual(m['info/program'], 'ExampleSimulation')
+            self.assertEqual(m['info/version'], 0.1)
+            self.assertEqual(m['parameters/layout/V1'], 100)
             self.assertEqual(m['parameters/a'], i)
+            self.assertEqual(m['results/E'], i)
 
     def test_standalone_experiment_without_index_file(self):
         c = copy.copy(self.c)
@@ -357,7 +875,10 @@ class TestExperiment(object):
         for i,m in enumerate(e.measurements()):
             self.assertEqual(m['info/measurement_id'], i+1)
             self.assertEqual(m['info/program'], 'ExampleSimulation')
+            self.assertEqual(m['info/version'], 0.1)
+            self.assertEqual(m['parameters/layout/V1'], 100)
             self.assertEqual(m['parameters/a'], i)
+            self.assertEqual(m['results/E'], i)
 
     def test_experiment_constructor(self):
         e = Experiment(self.d, 1, config=self.c,
@@ -413,7 +934,7 @@ class TestExperiment(object):
         self.run_example_experiment_1(e)
 
         self.assertTrue(self.exists('blah'))
-        self.assertEqual(e.number_of_measurements(), 1)
+        self.assertEqual(e.number_of_measurements(), 0)
 
     def test_continuing_measurements_in_experiment(self):
         e = Experiment(self.d,config=self.c)
@@ -465,6 +986,23 @@ class TestExperiment(object):
             self.assertEqual(m['parameters/a'], ns[i])
             c += 1
         self.assertEqual(c,8)
+
+    def test_experiment_with_stale_measurement_files(self):
+        e = Experiment(self.d,config=self.c)
+        self.run_example_experiment_1(e, (0,30))
+
+        # artificially reset measurement index file
+        e.mindex.createfile()
+        self.run_example_experiment_1(e, (0,10))
+
+        # now we have 10 real measurement files and 20 "stale" measurement
+        # files
+        self.assertEqual(e.number_of_measurements(), 10)
+        c = 0
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m['parameters/a'], i)
+            c += 1
+        self.assertEqual(c,10)
 
     def test_construct_and_use_a_parameter_set(self):
         d = OrderedDict([('t','parameters/t'),('V1','parameters/layout/V1')])
@@ -932,6 +1470,51 @@ class TestExperiment(object):
         rs = e.retrieve_results(tdef)
         self.assertEqual(rs[0].table.shape, (100,4))
         #print(rs[0].table)
+
+    def test_deactivate_experiment(self):
+        e = Experiment(self.d,id=30,config=self.c)
+        
+        e.description = 'Test experiment'
+        self.run_example_experiment_1(e)
+        
+        self.assertTrue(e.isactive())
+        self.assertEquals(e.number_of_measurements(), 10)
+        self.assertTrue(self.exists('experiment.000030'))
+        self.assertTrue(self.exists('measurement.index'))
+        for i in range(10):
+            self.assertTrue(self.exists('measurement.{:06d}'.format(i+1)))
+        
+        e.deactivate()
+        self.assertFalse(e.isactive())
+        self.assertEquals(e.number_of_measurements(), 10)
+        self.assertTrue(self.exists('experiment.000030'))
+        self.assertFalse(self.exists('measurement.index'))
+        for i in range(10):
+            self.assertFalse(self.exists('measurement.{:06d}'.format(i+1)))
+
+        fn1 = self.filename('experiment.000030')
+        fn2 = self.filename('experiment_reference.000030')
+        f = open(fn2, 'w')
+        f.write(files[self.format][2])
+        f.close()
+
+        self.assertTrue(filecmp.cmp(fn1,fn2,shallow=False))
+
+    def test_deacticating_an_inactive_experiment_fails(self):
+        fn = self.filename('experiment.000030')
+        f = open(fn, 'w')
+        f.write(files[self.format][2])
+        f.close()
+
+        e = Experiment(self.d, config=self.c)
+        self.assertFalse(e.isactive())
+
+        with self.assertRaises(ExperimentError):
+            e.deactivate()
+
+    def test_activate_experiment(self):
+        # TODO
+        pass
 
 class TestExperimentXML(TestExperiment,unittest.TestCase):
     def __init__(self, method='runTest'):

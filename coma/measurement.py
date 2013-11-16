@@ -33,7 +33,26 @@ class Measurement(object):
         self.id = None
         self.start_date = None
         self.end_date = None
-        self.data = {}
+        self._data = OrderedDict()
+
+    @property
+    def data(self):
+        return self._data
+
+    @data.setter
+    def data(self, o):
+        # ensures that some standard fields are always defined and in a
+        # specific order
+        i = OrderedDict([
+            ('measurement_id', self.id),
+            ('start_date', self.start_date),
+            ('end_date',self.end_date)])
+        if not o.has_key('info'):
+            o = OrderedDict([('info', i)] + o.items())
+        else:
+            i.update(o['info'])
+            o['info'] = i
+        self._data = o
 
     def __getitem__(self, i):
         return access_data_by_path(self.data, i)
@@ -65,27 +84,14 @@ class MemoryMeasurement(Measurement):
     def __init__(self, data):
         Measurement.__init__(self)
         self.data = data
-        i = OrderedDict([
-            ('measurement_id', self.id),
-            ('start_date', self.start_date),
-            ('end_date',self.end_date)])
-        
-        if not self.data.has_key('info'):
-            self.data = OrderedDict([('info', i)] + self.data.items())
-        else:
-            i.update(self.data['info'])
-            self.data['info'] = i
-            self.id = i['measurement_id']
-            self.start_date = i['start_date']
-            self.end_date = i['end_date']
+        self.id = self.data['info']['measurement_id']
+        self.start_date = self.data['info']['start_date']
+        self.end_date = self.data['info']['end_date']
 
 class FileMeasurement(Measurement):
     def __init__(self, filename, id=None, config=Config()):
         Measurement.__init__(self)
         self.id = id
-        self.start_date = None
-        self.end_date = None
-        self.data = {}
         self.archive = Archive(filename, 'measurement', default_format=config.default_format)
         if archive_exists(filename):
             self.load()
@@ -97,18 +103,14 @@ class FileMeasurement(Measurement):
         self.end_date = current_date_as_string()
 
     def save(self, m):
+        a = MemoryArchive()
+        o = a.serialize(m)
+
         i = OrderedDict()
         if hasattr(m, 'program'):
             i['program'] = m.program
         if hasattr(m, 'version'):
             i['version'] = m.version
-        i['measurement_id'] = self.id
-        i['start_date'] = self.start_date
-        i['end_date'] = self.end_date
-
-        a = MemoryArchive()
-        o = a.serialize(m)
-
         if not o.has_key('info'):
             o = OrderedDict([('info', i)] + o.items())
         else:
@@ -116,15 +118,11 @@ class FileMeasurement(Measurement):
             o['info'] = i
 
         self.data = o
-
-        self.archive.save(o)
+        self.archive.save(self.data)
 
     def load(self):
         self.data = self.archive.load()
         i = self.data['info']
-        if i.has_key('measurement_id'):
-            self.id = i['measurement_id']
-        ks = ['start_date', 'end_date']
-        for k in ks:
-            if i.has_key(k):
-                self.__setattr__(k, i[k])
+        self.id = i['measurement_id']
+        self.start_date = i['start_date']
+        self.end_date = i['end_date']
