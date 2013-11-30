@@ -568,7 +568,7 @@ class TestExperiment(object):
 
         os.mkdir(self.d)
         i = IndexFile(self.fi, 'experiment', default_format=self.format)
-        i.createfile()
+        i.create()
         i.increment()
         i.increment()
 
@@ -720,8 +720,6 @@ class TestExperiment(object):
         self.assertEquals(e.description, 'Miau')
 
         with self.assertRaises(ExperimentError):
-            # TODO: maybe, in this case, we should better create a new
-            # experiment with id 42?
             e = Experiment(self.d, id=42, config=self.c)
         with self.assertRaises(ExperimentError):
             e = Experiment(self.d, config=self.c)
@@ -901,19 +899,50 @@ class TestExperiment(object):
             self.assertEqual(m['info/measurement_id'], i+1)
             self.assertEqual(m['info/program'], 'ExampleSimulation')
             self.assertEqual(m['parameters/a'], i)
+        for i in range(1,11):
+            self.assertTrue(self.exists('measurement.{:06d}'.format(i)))
         
         e = Experiment(self.d,config=self.c)
         e.reset()
-        self.run_example_experiment_1(e, (20,25))
-        e.start()
-
         del(e)
         e = Experiment(self.d,config=self.c)
+        
+        self.assertEqual(e.number_of_measurements(), 0)
+        for i in range(1,11):
+            self.assertFalse(self.exists('measurement.{:06d}'.format(i)))
+        
+        self.run_example_experiment_1(e, (20,25))
+
+        for i in range(1,6):
+            self.assertTrue(self.exists('measurement.{:06d}'.format(i)))
+
         self.assertEqual(e.number_of_measurements(), 5)
         for i,m in enumerate(e.measurements()):
             self.assertEqual(m['info/measurement_id'], i+1)
             self.assertEqual(m['info/program'], 'ExampleSimulation')
             self.assertEqual(m['parameters/a'], i+20)
+
+    def test_resetting_experiment_with_stale_measurements(self):
+        # create stale measurement files
+        e = Experiment(self.d,config=self.c)
+        self.run_example_experiment_1(e, (0,30))
+        e.mindex.create()
+        for i in range(1,11):
+            os.remove(self.filename('measurement.{:06d}'.format(i)))
+
+        # Rerun
+        self.run_example_experiment_1(e, (0,10))
+        self.assertEqual(e.number_of_measurements(), 10)
+        for i in range(1,31):
+            self.assertTrue(self.exists('measurement.{:06d}'.format(i)))
+
+        # Reset does only delete the experiment's measurements, not stale files
+        e.reset()
+        self.assertEqual(e.number_of_measurements(), 0)
+        for i in range(1,11):
+            self.assertFalse(self.exists('measurement.{:06d}'.format(i)))
+        for i in range(11,31):
+            self.assertTrue(self.exists('measurement.{:06d}'.format(i)))
 
     def test_experiment_with_different_measurement_filename(self):
         c = copy.copy(self.c)
@@ -931,10 +960,14 @@ class TestExperiment(object):
         c = copy.copy(self.c)
         c.measurement_file = 'blah'
         e = Experiment(self.d, config=c)
-        self.run_example_experiment_1(e)
+        self.run_example_experiment_1(e, (0,1))
 
         self.assertTrue(self.exists('blah'))
         self.assertEqual(e.number_of_measurements(), 0)
+
+        # Can't overwrite the `blah` measurement file
+        with self.assertRaises(ExperimentError):
+            self.run_example_experiment_1(e, (0,1))
 
     def test_continuing_measurements_in_experiment(self):
         e = Experiment(self.d,config=self.c)
@@ -988,11 +1021,14 @@ class TestExperiment(object):
         self.assertEqual(c,8)
 
     def test_experiment_with_stale_measurement_files(self):
+        # create stale measurement files
         e = Experiment(self.d,config=self.c)
         self.run_example_experiment_1(e, (0,30))
+        e.mindex.create()
+        for i in range(1,11):
+            os.remove(self.filename('measurement.{:06d}'.format(i)))
 
-        # artificially reset measurement index file
-        e.mindex.createfile()
+        # run again
         self.run_example_experiment_1(e, (0,10))
 
         # now we have 10 real measurement files and 20 "stale" measurement
@@ -1003,6 +1039,10 @@ class TestExperiment(object):
             self.assertEqual(m['parameters/a'], i)
             c += 1
         self.assertEqual(c,10)
+
+        # Trying to overwrite existing (stale) measurement files will fail
+        with self.assertRaises(ExperimentError):
+            self.run_example_experiment_1(e, (0,1))
 
     def test_construct_and_use_a_parameter_set(self):
         d = OrderedDict([('t','parameters/t'),('V1','parameters/layout/V1')])
@@ -1543,7 +1583,7 @@ class TestExperimentXMLAndJsonMixed(unittest.TestCase):
 
     def test_default_format_is_json(self):
         i = IndexFile(self.fi, 'experiment')
-        i.createfile()
+        i.create()
 
         c = Config()
         c.experiment_index = self.fi
@@ -1567,7 +1607,7 @@ class TestExperimentXMLAndJsonMixed(unittest.TestCase):
 
     def test_can_use_xml_format(self):
         i = IndexFile(self.fi, 'experiment', default_format='xml')
-        i.createfile()
+        i.create()
 
         c = Config()
         c.experiment_index = self.fi

@@ -92,10 +92,6 @@ class ParameterSet(object):
         s += ')'
         return s
 
-# TODO: internal state of Experiment is quite complex (e.g. active / inactive,
-# index file, no index file, etc) and I need to keep track of it in several
-# methods; maybe try to simplify this (e.g. abstract access to mindex)
-
 class Experiment(object):
     def __init__(self, dir, id=None, description=None, tags=[], config=Config()):
         self.dir = dir
@@ -106,22 +102,18 @@ class Experiment(object):
         self.start_date = None
         self.end_date = None
         self.config = config
-
+        self._measurements = None
         self.pset_definition = OrderedDict()
         self.psets = []
-        
-        self.eindex = None
-        if archive_exists(self.config.experiment_index_path):
-            self.eindex = IndexFile(self.config.experiment_index_path, 'experiment', 
-                                    default_format=self.config.default_format)
 
         if not os.path.exists(self.dir):
             os.mkdir(self.dir)
-
-        # Measurements
-        self._measurements = None
-        self.last_mid = 0
-        self.mindex = None
+        
+        self.eindex = IndexFile(self.config.experiment_index_path, 'experiment', 
+                                default_format=self.config.default_format)
+        mindexfile = os.path.join(self.dir,self.config.measurement_index)
+        self.mindex = IndexFile(mindexfile, 'measurement', 
+                                default_format=self.config.default_format)
 
         # Retrieve files matching the experiment_file config variable.
         #
@@ -136,15 +128,13 @@ class Experiment(object):
         #
         # If there are multiple matching files, then we load the one matching
         # the provided experiment id. Never loads a measurement index file.
-        mindexfile = os.path.join(self.dir,self.config.measurement_index)
         fs = self._matching_experiment_files()
         if len(fs) == 0:
-            if self.id is None and self.eindex is not None:
+            if self.id is None and self.eindex.exists():
                 self.id = self.eindex.increment()
             f = os.path.join(self.dir,self._experiment_filename())
             self.archive = Archive(f, 'experiment', default_format=self.config.default_format)
-            self.mindex = IndexFile(mindexfile, 'measurement', 
-                                    default_format=self.config.default_format)
+            self.mindex.create()
             self.save()
             self.load()
         elif len(fs) == 1:
@@ -152,9 +142,6 @@ class Experiment(object):
                 self.id = fs[0][0]
             f = os.path.join(self.dir, fs[0][1])
             self.archive = Archive(f, 'experiment', default_format=self.config.default_format)
-            if archive_exists(mindexfile):
-                self.mindex = IndexFile(mindexfile, 'measurement', 
-                                        default_format=self.config.default_format)
             self.load()
         else:
             d = dict(fs)
@@ -201,11 +188,8 @@ class Experiment(object):
                 self.__setattr__(k, i[k])
 
         self._measurements = None
-        self.last_mid = 0
         if o.has_key('measurements'):
             self._measurements = o['measurements']
-        elif self.mindex is not None:
-            self.last_mid = self.mindex.read()
 
     def deactivate(self):
         if not self.isactive():
@@ -217,7 +201,7 @@ class Experiment(object):
         self.save()
 
         # Read back and verify everything got written correctly.
-        # TODO: do a self.load() first
+        self.load()
         equal = True
         if self._number_of_file_measurements() != self._number_of_memory_measurements():
             equal = False
@@ -225,14 +209,13 @@ class Experiment(object):
             if m1.data != m2.data:
                 equal = False
         if not equal:
-            raise ExperimentError('Could not deactivate experiment')
+            raise ExperimentError('Could not deactivate experiment. Leaving '
+                                  'experiment in inconsistent state. Please '
+                                  'investigate by hand.')
 
-        # TODO: what happens if mindex is None to start with?
         for m in self._file_measurements():
             os.remove(m.archive.filename)
-        os.remove(self.mindex.archive.filename)
-        self.mindex = None
-        self.last_mid = 0
+        self.mindex.remove()
 
     def isactive(self):
         return self._measurements is None
@@ -247,10 +230,11 @@ class Experiment(object):
         self.start_date = None
         self.end_date = None
         if self.isactive():
-            # TODO: delete only filenames with matching ids (i.e. not all matching files)
-            self.mindex.createfile()
-            self.last_mid = self.mindex.read()
-            for _,f in self._matching_measurement_files():
+            last_mid = self.mindex.get()
+            self.mindex.create()
+            for mid,f in self._matching_measurement_files():
+                if mid < 1 or mid>last_mid:
+                    continue
                 f = os.path.join(self.dir, f)
                 a = Archive(f)
                 os.remove(a.filename)
@@ -264,8 +248,10 @@ class Experiment(object):
         mid = self.mindex.increment()
         f = self._measurement_filename(mid)
         f = os.path.join(self.dir, f)
+        if archive_exists(f):
+            raise ExperimentError('Cannot create measurement with id {}: The '
+                                  'measurement already exists.'.format(mid))
         m = FileMeasurement(f, mid, config=self.config)
-        self.last_mid = mid
         return m
 
     def measurements(self):
@@ -275,7 +261,7 @@ class Experiment(object):
             return self._memory_measurements()
 
     def _file_measurements(self):
-        for mid in range(1,self.last_mid+1):
+        for mid in range(1,self.mindex.get()+1):
             f = self._measurement_filename(mid)
             f = os.path.join(self.dir, f)
             if archive_exists(f):
@@ -295,7 +281,7 @@ class Experiment(object):
 
     def _number_of_file_measurements(self):
         fs = self._matching_measurement_files()
-        ls = [(1 if (mid!=0 and mid<=self.last_mid) else 0) for mid,f in fs]
+        ls = [(1 if (mid!=0 and mid<=self.mindex.get()) else 0) for mid,f in fs]
         return sum(ls)
 
     def _number_of_memory_measurements(self):
