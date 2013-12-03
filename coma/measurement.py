@@ -102,22 +102,21 @@ class FileMeasurement(Measurement):
     def end(self):
         self.end_date = current_date_as_string()
 
-    def save(self, m):
-        a = MemoryArchive()
-        o = a.serialize(m)
-
-        i = OrderedDict()
-        if hasattr(m, 'program'):
-            i['program'] = m.program
-        if hasattr(m, 'version'):
-            i['version'] = m.version
-        if not o.has_key('info'):
-            o = OrderedDict([('info', i)] + o.items())
-        else:
-            i.update(o['info'])
-            o['info'] = i
-
-        self.data = o
+    def save(self, m=None):
+        if m is not None:
+            a = MemoryArchive()
+            o = a.serialize(m)
+            i = OrderedDict()
+            if hasattr(m, 'program'):
+                i['program'] = m.program
+            if hasattr(m, 'version'):
+                i['version'] = m.version
+            if not o.has_key('info'):
+                o = OrderedDict([('info', i)] + o.items())
+            else:
+                i.update(o['info'])
+                o['info'] = i
+            self.data = o
         self.archive.save(self.data)
 
     def load(self):

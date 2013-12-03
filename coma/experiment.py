@@ -191,6 +191,40 @@ class Experiment(object):
         if o.has_key('measurements'):
             self._measurements = o['measurements']
 
+    def activate(self):
+        if self.isactive():
+            raise ExperimentError('Experiment already is active')
+        last_mid = 0
+        for m in self._memory_measurements():
+            f = self._measurement_filename(m.id)
+            f = os.path.join(self.dir, f)
+            if archive_exists(f):
+                raise ExperimentError('Cannot create measurement with id {}: The '
+                                      'measurement already exists.'.format(m.id))
+            fm = FileMeasurement(f, m.id, config=self.config)
+            fm.data = m.data
+            fm.save()
+            if m.id is not None and m.id > last_mid:
+                last_mid = m.id
+        self.mindex.create()
+        self.mindex.set(last_mid)
+
+        # Read back and verify everything got written correctly.
+        equal = True
+        if self._number_of_file_measurements() != self._number_of_memory_measurements():
+            equal = False
+        for m1,m2 in zip(self._file_measurements(), self._memory_measurements()):
+            if m1.data != m2.data:
+                equal = False
+        if not equal:
+            raise ExperimentError('Could not activate experiment. Leaving '
+                                  'experiment in inconsistent state. Please '
+                                  'investigate by hand.')
+
+        self._measurements = None
+        self.save()
+        self.load()
+
     def deactivate(self):
         if not self.isactive():
             raise ExperimentError('Experiment already is inactive')

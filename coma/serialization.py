@@ -7,6 +7,8 @@ from importlib import import_module
 import math
 import os
 
+# TODO: make serialization hooks configurable
+# TODO: do not use pickle hooks by default (i.e. not "__getstate__")
 class Serializer(object):
     def serialize(self, o):
         if hasattr(o, '__getstate__'):
@@ -265,22 +267,25 @@ class Archive(object):
         self.serializer = serializer
         self.indent = indent
 
-        self._f = self._infer_format()
-        self.filename = self.basename + '.' + self._f
-        self._a = self._archive_factory()
+        self.format = self._infer_format()
+        self.filename = self.basename + '.' + self.format
+        self._a = self._archive_factory(self.format)
 
-    def save(self, o):
-        # TODO: parameter to force saving to a particular format, i.e. to
-        # convert from one format to the other
-        self._a.dumpfile(o, self.filename)
+    def save(self, o, format=None):
+        if format is None or format == self.format:
+            self._a.dumpfile(o, self.filename)
+            return
+        filename = self.basename + '.' + format
+        a = self._archive_factory(format)
+        a.dumpfile(o, filename)
 
     def load(self):
         return self._a.loadfile(self.filename)
 
-    def _archive_factory(self):
-        if not self.classes.has_key(self._f):
-            raise ArchiveError('Unsupported archive format: {}'.format(self._f))
-        A = self.classes[self._f]
+    def _archive_factory(self, format):
+        if not self.classes.has_key(format):
+            raise ArchiveError('Unsupported archive format: {}'.format(format))
+        A = self.classes[format]
         return A(self.name, self.serializer, self.indent)
     
     def _infer_format(self):
@@ -302,4 +307,3 @@ def archive_exists(basename):
         if os.path.exists(basename + '.' + f):
             return True
     return False
-

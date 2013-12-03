@@ -599,3 +599,46 @@ class TestArchive(unittest.TestCase):
         self.assertEqual(o, test_data['list'])
 
         os.remove('testarchive.json')
+
+    def test_save_archive_to_different_format(self):
+        f1 = 'testarchive1.xml'
+        f2 = 'testarchive1.json'
+        f2_ref = 'testarchive1_reference.json'
+        f = open(f1, 'w')
+        f.write(test_xml['simple'])
+        f.close()
+        f = open(f2_ref, 'w')
+        f.write(test_json['simple'])
+        f.close()
+
+        # Note: This should be mainly useful for format conversions.
+        a = Archive('testarchive1', 'measurement')
+        a.save(a.load(), format='json')
+        
+        self.assertTrue(os.path.exists(f1))
+        self.assertTrue(os.path.exists(f2))
+
+        with self.assertRaises(ArchiveError):
+            a = Archive('testarchive1', 'measurement')
+
+        os.remove(f1)
+        a = Archive('testarchive1', 'measurement')
+        o = a.load()
+
+        self.assertEqual(o, test_data['simple'])
+        self.assertTrue(filecmp.cmp(f2, f2_ref, shallow=False))
+        
+        for f in [f2,f2_ref]:
+            os.remove(f)
+
+    def test_save_archive_to_different_format_with_invalid_format_fails(self):
+        f1 = 'testarchive1.xml'
+        f = open(f1, 'w')
+        f.write(test_xml['simple'])
+        f.close()
+
+        a = Archive('testarchive1', 'measurement')
+        with self.assertRaises(ArchiveError):
+            a.save(a.load(), format='invalid')
+
+        os.remove(f1)

@@ -520,9 +520,70 @@ JSON_FILE_3='''\
   }
 }'''
 
+XML_FILE_4='''\
+<experiment>
+  <info>
+    <experiment_id>30</experiment_id>
+    <description>Test experiment</description>
+    <tags>
+      <count>0</count>
+      <item_version>0</item_version>
+    </tags>
+    <start_date/>
+    <end_date/>
+  </info>
+  <measurements>
+    <count>0</count>
+    <item_version>0</item_version>
+  </measurements>
+</experiment>
+'''
+
+JSON_FILE_4='''\
+{
+  "experiment": {
+    "info": {
+      "experiment_id": 30,
+      "description": "Test experiment",
+      "tags": [],
+      "start_date": null,
+      "end_date": null
+    },
+    "measurements": []
+  }
+}'''
+
+XML_FILE_5='''\
+<experiment>
+  <info>
+    <experiment_id>30</experiment_id>
+    <description>Test experiment</description>
+    <tags>
+      <count>0</count>
+      <item_version>0</item_version>
+    </tags>
+    <start_date/>
+    <end_date/>
+  </info>
+</experiment>
+'''
+
+JSON_FILE_5='''\
+{
+  "experiment": {
+    "info": {
+      "experiment_id": 30,
+      "description": "Test experiment",
+      "tags": [],
+      "start_date": null,
+      "end_date": null
+    }
+  }
+}'''
+
 files = {
-    'xml': [XML_FILE_1,XML_FILE_2,XML_FILE_3],
-    'json': [JSON_FILE_1,JSON_FILE_2,JSON_FILE_3]
+    'xml': [XML_FILE_1,XML_FILE_2,XML_FILE_3,XML_FILE_4,XML_FILE_5],
+    'json': [JSON_FILE_1,JSON_FILE_2,JSON_FILE_3,JSON_FILE_4,JSON_FILE_5]
 }
 
 class ExampleSimulation(object):
@@ -554,8 +615,6 @@ class ExampleSimulation(object):
         i['parameters']['layout']['N'] = self.N
         i['results'] = self.results
         return i
-
-# TODO: test resetting an inactive experiment, test reset when an index file does not exist
 
 class TestExperiment(object):
     def setUp(self):
@@ -1540,7 +1599,7 @@ class TestExperiment(object):
 
         self.assertTrue(filecmp.cmp(fn1,fn2,shallow=False))
 
-    def test_deacticating_an_inactive_experiment_fails(self):
+    def test_deactivate_an_inactive_experiment_fails(self):
         fn = self.filename('experiment.000030')
         f = open(fn, 'w')
         f.write(files[self.format][2])
@@ -1552,9 +1611,178 @@ class TestExperiment(object):
         with self.assertRaises(ExperimentError):
             e.deactivate()
 
+    def test_reset_an_inactive_experiment(self):
+        fn1 = self.filename('experiment.000030')
+        f = open(fn1, 'w')
+        f.write(files[self.format][2])
+        f.close()
+        fn2 = self.filename('experiment_reference.000030')
+        f = open(fn2, 'w')
+        f.write(files[self.format][3])
+        f.close()
+
+        e = Experiment(self.d, config=self.c)
+        self.assertFalse(e.isactive())
+        self.assertEquals(e.number_of_measurements(), 10)
+        e.reset()
+        self.assertEquals(e.number_of_measurements(), 0)
+
+        e = Experiment(self.d, config=self.c)
+        self.assertFalse(e.isactive())
+        self.assertEquals(e.number_of_measurements(), 0)
+
+        self.assertTrue(filecmp.cmp(fn1,fn2,shallow=False))
+
     def test_activate_experiment(self):
-        # TODO
-        pass
+        fn1 = self.filename('experiment.000030')
+        f = open(fn1, 'w')
+        f.write(files[self.format][2])
+        f.close()
+        fn2 = self.filename('experiment_reference.000030')
+        f = open(fn2, 'w')
+        f.write(files[self.format][4])
+        f.close()
+
+        e = Experiment(self.d, config=self.c)
+        self.assertFalse(e.isactive())
+        self.assertEquals(e.number_of_measurements(), 10)
+        
+        e.activate()
+
+        self.assertTrue(e.isactive())
+        self.assertEquals(e.number_of_measurements(), 10)
+        self.assertTrue(self.exists('experiment.000030'))
+        self.assertTrue(self.exists('measurement.index'))
+        self.assertEquals(e.mindex.get(), 10);
+        for i in range(10):
+            self.assertTrue(self.exists('measurement.{:06d}'.format(i+1)))
+        i = 0
+        for m in e.measurements():
+            i += 1
+            self.assertEquals(m.id, i)
+            self.assertEquals(m.results.E, i-1)
+            self.assertEquals(m.parameters.layout.V1, 100)
+            self.assertEquals(m.info.program, 'ExampleSimulation')
+        self.assertTrue(filecmp.cmp(fn1,fn2,shallow=False))
+
+        # test again, after constructing a new Experiment object
+        e = Experiment(self.d, config=self.c)
+        self.assertTrue(e.isactive())
+        self.assertEquals(e.number_of_measurements(), 10)
+        self.assertTrue(self.exists('experiment.000030'))
+        self.assertTrue(self.exists('measurement.index'))
+        self.assertEquals(e.mindex.get(), 10);
+        for i in range(10):
+            self.assertTrue(self.exists('measurement.{:06d}'.format(i+1)))
+        i = 0
+        for m in e.measurements():
+            i += 1
+            self.assertEquals(m.id, i)
+            self.assertEquals(m.results.E, i-1)
+            self.assertEquals(m.parameters.layout.V1, 100)
+            self.assertEquals(m.info.program, 'ExampleSimulation')
+        self.assertTrue(i, 10)
+        self.assertTrue(filecmp.cmp(fn1,fn2,shallow=False))
+
+    def test_activate_an_active_experiment_fails(self):
+        fn = self.filename('experiment.000030')
+        f = open(fn, 'w')
+        f.write(files[self.format][2])
+        f.close()
+
+        e = Experiment(self.d, config=self.c)
+        self.assertFalse(e.isactive())
+        e.activate()
+        self.assertTrue(e.isactive())
+
+        with self.assertRaises(ExperimentError):
+            e.activate()
+
+    def test_continue_previously_inactive_experiment(self):
+        fn = self.filename('experiment.000030')
+        f = open(fn, 'w')
+        f.write(files[self.format][2])
+        f.close()
+
+        e = Experiment(self.d, config=self.c)
+        self.assertFalse(e.isactive())
+        self.assertEquals(e.number_of_measurements(), 10)
+        e.activate()
+        self.run_example_experiment_1(e,(10,15))
+        
+        self.assertTrue(e.isactive())
+        self.assertEquals(e.number_of_measurements(), 15)
+        for i in range(15):
+            self.assertTrue(self.exists('measurement.{:06d}'.format(i+1)))
+        i = 0
+        for m in e.measurements():
+            i += 1
+            self.assertEquals(m.id, i)
+            self.assertEquals(m.results.E, i-1)
+            self.assertEquals(m.parameters.layout.V1, 100)
+            self.assertEquals(m.info.program, 'ExampleSimulation')
+        self.assertTrue(i, 15)
+
+    def test_activate_deactivate_experiment_roundtrips(self):
+        fn1 = self.filename('experiment.000030')
+        f = open(fn1, 'w')
+        f.write(files[self.format][2])
+        f.close()
+        fn2 = self.filename('experiment_reference.000030')
+        f = open(fn2, 'w')
+        f.write(files[self.format][2])
+        f.close()
+
+        e = Experiment(self.d, config=self.c)
+        self.assertFalse(e.isactive())
+        e.activate()
+        self.assertTrue(e.isactive())
+        e.deactivate()
+
+        e = Experiment(self.d, config=self.c)
+        e.save()
+        self.assertTrue(filecmp.cmp(fn1,fn2,shallow=False))
+
+    def test_deactivate_activate_experiment_with_missing_measurements(self):
+        e = Experiment(self.d,config=self.c)
+        self.run_example_experiment_1(e)
+
+        f1 = self.filename('measurement.000001')
+        f2 = self.filename('measurement.000007')
+        self.assertTrue(os.path.exists(f1))
+        self.assertTrue(os.path.exists(f2))
+        os.remove(f1)
+        os.remove(f2)
+
+        self.assertEqual(e.number_of_measurements(), 8)
+        ns = [2,3,4,5,6,8,9,10]
+        for n in ns:
+            self.assertTrue(self.exists('measurement.{:06d}'.format(n)))
+        
+        e.deactivate()
+
+        self.assertEqual(e.number_of_measurements(), 8)
+        for n in ns:
+            self.assertFalse(self.exists('measurement.{:06d}'.format(n)))
+        c = 0
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m.id, ns[i])
+            self.assertEqual(m['parameters/a'], ns[i]-1)
+            c += 1
+        self.assertEqual(c,8)
+
+        e.activate()
+        self.assertEqual(e.number_of_measurements(), 8)
+        for n in ns:
+            self.assertTrue(self.exists('measurement.{:06d}'.format(n)))
+        self.assertFalse(os.path.exists(f1))
+        self.assertFalse(os.path.exists(f2))
+        c = 0
+        for i,m in enumerate(e.measurements()):
+            self.assertEqual(m.id, ns[i])
+            self.assertEqual(m['parameters/a'], ns[i]-1)
+            c += 1
+        self.assertEqual(c,8)
 
 class TestExperimentXML(TestExperiment,unittest.TestCase):
     def __init__(self, method='runTest'):

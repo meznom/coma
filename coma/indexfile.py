@@ -21,6 +21,14 @@ class IndexFile(object):
         o = self.archive.load()
         return o[self.element]
 
+    def set(self, i):
+        if not self.exists():
+            return
+        o = {self.element: i}
+        self.lock()
+        self.archive.save(o)
+        self.unlock()
+
     def increment(self):
         if not self.exists():
             return 0
