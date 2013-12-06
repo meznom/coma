@@ -8,7 +8,7 @@ from distutils.command.sdist import sdist as _sdist
 from distutils.command.install import install as _install
 
 VERSION_PY_FILENAME = 'coma/_version.py'
-VERSION_PY = """
+VERSION_PY = """\
 # This file is originally generated from Git information by running 'setup.py
 # version'. Distribution tarballs contain a pre-generated copy of this file.
 
@@ -105,6 +105,7 @@ setup(name='coma',
       description='The computational condensed matter physics programming toolkit.',
       author='Burkhard Ritter',
       author_email='burkhard@ualberta.ca',
+      license='BSD',
       url='https://bitbucket.org/meznom/coma',
       packages=['coma'],
       cmdclass={'version': Version, 'sdist': sdist, 'install': install}

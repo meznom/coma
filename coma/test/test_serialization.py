@@ -1,3 +1,6 @@
+# Copyright (c) 2013, Burkhard Ritter
+# This code is distributed under the two-clause BSD License.
+
 import unittest
 from collections import OrderedDict
 from coma import XMLArchive, XMLArchiveError, JsonArchive, JsonArchiveError, \

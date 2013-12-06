@@ -1,3 +1,6 @@
+# Copyright (c) 2013, Burkhard Ritter
+# This code is distributed under the two-clause BSD License.
+
 from collections import OrderedDict
 import os
 import re

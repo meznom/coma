@@ -1,3 +1,6 @@
+# Copyright (c) 2013, Burkhard Ritter
+# This code is distributed under the two-clause BSD License.
+
 INVALID_VALUE = 'INVALID_VALUE'
 
 def access_data_by_path(data, path):

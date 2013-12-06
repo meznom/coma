@@ -5,9 +5,9 @@
 > A small library to help with the data management of computational condensed
 > matter physics projects.
 
-Coma is the Computational Condensed Matter Physics Programming Toolkit. This is
+[Coma][1] is the Computational Condensed Matter Physics Programming Toolkit. This is
 the second iteration of the library (version 2.x.x) which is different from and
-incompatible with [version 1][1].
+incompatible with [version 1][2].
 
 ## Installation
 
@@ -19,4 +19,5 @@ Python module, go to the Coma source directory and run the `setup.py` file.
 For the time being, we recommend to install to your home directory, and that's
 what the `--user` switch does.
 
-[1]: https://bitbucket.org/cjchandler/coma-toolkit
+[1]: https://bitbucket.org/meznom/coma
+[2]: https://bitbucket.org/cjchandler/coma-toolkit
