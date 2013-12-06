@@ -7,7 +7,7 @@ from distutils.core import setup, Command, Extension
 from distutils.command.sdist import sdist as _sdist
 from distutils.command.install import install as _install
 
-VERSION_PY_FILENAME = 'src/python/coma/_version.py'
+VERSION_PY_FILENAME = 'coma/_version.py'
 VERSION_PY = """
 # This file is originally generated from Git information by running 'setup.py
 # version'. Distribution tarballs contain a pre-generated copy of this file.
@@ -23,6 +23,13 @@ conveniently call the coma script on the command line, add
 to your "~/.bashrc" and restart your terminal.'''
 
 def update_version_py():
+    """Update version file with version from Git.
+
+    Constructs semver.org compatible version strings, provided that the Git tag
+    is already a semver.org compatible version. The number of commits since the
+    last tag and the abbreviated commit hash are appended as a pre-release
+    version. An example: 2.0.0-25.gf52f551.
+    """
     ver = 'unknown'
     try:
         p = subprocess.Popen(["git", "describe", "--dirty", "--always"],
@@ -31,7 +38,12 @@ def update_version_py():
         if p.returncode != 0:
             print('unable to run git')
         else:
-            ver = stdout.strip()
+            # Git describe returns one or more strings separated by a dash
+            s = stdout.strip()
+            fs = s.split('-')
+            ver = fs[0]
+            if len(fs) > 1:
+                ver += '-' + '.'.join(fs[1:])
     except EnvironmentError:
         print('unable to run git')
     if os.path.exists(VERSION_PY_FILENAME) and ver == 'unknown':
@@ -90,13 +102,10 @@ class install(_install):
 
 setup(name='coma',
       version=get_version(),
-      description='The computational condensed matter physics toolkit.',
+      description='The computational condensed matter physics programming toolkit.',
       author='Burkhard Ritter',
       author_email='burkhard@ualberta.ca',
-      url='https://bitbucket.org/cjchandler/coma-toolkit',
-      scripts=['src/python/scripts/coma'],
+      url='https://bitbucket.org/meznom/coma',
       packages=['coma'],
-      package_dir={'coma': 'src/python/coma'},
-      package_data={'coma': ['data/templates/*/*']},
       cmdclass={'version': Version, 'sdist': sdist, 'install': install}
       )
