@@ -3,7 +3,7 @@ from collections import OrderedDict
 import os
 import shutil
 import copy
-from coma import FileMeasurement, MemoryMeasurement, Config
+from coma import FileMeasurement, MemoryMeasurement
 
 class ExampleSimulation(object):
     def __init__(self):
@@ -19,7 +19,7 @@ class ExampleSimulation(object):
     def run(self):
         pass
 
-    def __getstate__(self):
+    def coma_getstate(self):
         i = OrderedDict([
             ('parameters', OrderedDict([
                         ('a', self.a),
@@ -35,8 +35,10 @@ class TestFileMeasurement():
         self.f = os.path.join(base_dir, 'testmeasurement')
         self.fn = os.path.join(base_dir, 'testmeasurement.' + self.format)
 
-        self.c = Config()
-        self.c.default_format = self.format
+        self.c = {
+            'archive_default_format': self.format,
+            'serializer_getstate': '__getstate__'
+        }
         
         if os.path.exists(self.fn):
             os.remove(self.fn)

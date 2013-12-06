@@ -1,9 +1,8 @@
 import os
 from .serialization import Archive, archive_exists
-from .config import Config
 
 class IndexFile(object):
-    def __init__(self, filename, indextype, default_format='json'):
+    def __init__(self, filename, indextype, config=None):
         self.filename = filename
         self.element = ''
         archive_name = ''
@@ -13,7 +12,7 @@ class IndexFile(object):
         elif indextype == 'measurement':
             archive_name = 'measurements'
             self.element = 'last_measurement_id'
-        self.archive = Archive(filename, archive_name, default_format=default_format)
+        self.archive = Archive(filename, archive_name, config=config)
 
     def get(self):
         if not self.exists():

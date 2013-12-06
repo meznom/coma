@@ -1,21 +1,7 @@
 from collections import OrderedDict
 from .serialization import Archive, MemoryArchive, archive_exists
-from .config import Config
 from .path import access_data_by_path
 from .util import current_date_as_string
-
-# Works, but makes a copy of everything we access
-# class DictAsObject(dict):
-#     def __init__(self, *args, **kwargs):
-#         super(DictAsObject, self).__init__(*args, **kwargs)
-#         self.__dict__ = self
-# 
-#     def __getattribute__(self, name):
-#          a = super(DictAsObject, self).__getattribute__(name)
-#          if isinstance(a,dict):
-#              return DictAsObject(a)
-#          else:
-#              return a
 
 class DictAsObject(object):
     def __init__(self, d):
@@ -89,10 +75,10 @@ class MemoryMeasurement(Measurement):
         self.end_date = self.data['info']['end_date']
 
 class FileMeasurement(Measurement):
-    def __init__(self, filename, id=None, config=Config()):
+    def __init__(self, filename, id=None, config=None):
         Measurement.__init__(self)
         self.id = id
-        self.archive = Archive(filename, 'measurement', default_format=config.default_format)
+        self.archive = Archive(filename, 'measurement', config=config)
         if archive_exists(filename):
             self.load()
 

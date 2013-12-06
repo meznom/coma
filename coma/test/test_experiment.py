@@ -5,8 +5,14 @@ import shutil
 import copy
 import glob
 import filecmp
-from coma import Experiment, ExperimentError, Config, IndexFile, \
-                 ParameterSet, ResultList, Result, Archive
+from coma import Experiment, ExperimentError, IndexFile, ParameterSet, \
+                 ResultList, Result, Archive, expand_path, load_config
+
+_CONFIG_FILE_1='''\
+[coma]
+experiment_file = muh.${experiment_id}
+experiment_index = quark
+'''
 
 XML_FILE_1='''\
 <experiment>
@@ -81,7 +87,7 @@ XML_FILE_3='''\
       <results>
         <E>0</E>
       </results>
-      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+      <__class__>coma.test.test_experiment.ExampleSimulation</__class__>
     </item>
     <item>
       <info>
@@ -103,7 +109,7 @@ XML_FILE_3='''\
       <results>
         <E>1</E>
       </results>
-      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+      <__class__>coma.test.test_experiment.ExampleSimulation</__class__>
     </item>
     <item>
       <info>
@@ -125,7 +131,7 @@ XML_FILE_3='''\
       <results>
         <E>2</E>
       </results>
-      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+      <__class__>coma.test.test_experiment.ExampleSimulation</__class__>
     </item>
     <item>
       <info>
@@ -147,7 +153,7 @@ XML_FILE_3='''\
       <results>
         <E>3</E>
       </results>
-      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+      <__class__>coma.test.test_experiment.ExampleSimulation</__class__>
     </item>
     <item>
       <info>
@@ -169,7 +175,7 @@ XML_FILE_3='''\
       <results>
         <E>4</E>
       </results>
-      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+      <__class__>coma.test.test_experiment.ExampleSimulation</__class__>
     </item>
     <item>
       <info>
@@ -191,7 +197,7 @@ XML_FILE_3='''\
       <results>
         <E>5</E>
       </results>
-      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+      <__class__>coma.test.test_experiment.ExampleSimulation</__class__>
     </item>
     <item>
       <info>
@@ -213,7 +219,7 @@ XML_FILE_3='''\
       <results>
         <E>6</E>
       </results>
-      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+      <__class__>coma.test.test_experiment.ExampleSimulation</__class__>
     </item>
     <item>
       <info>
@@ -235,7 +241,7 @@ XML_FILE_3='''\
       <results>
         <E>7</E>
       </results>
-      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+      <__class__>coma.test.test_experiment.ExampleSimulation</__class__>
     </item>
     <item>
       <info>
@@ -257,7 +263,7 @@ XML_FILE_3='''\
       <results>
         <E>8</E>
       </results>
-      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+      <__class__>coma.test.test_experiment.ExampleSimulation</__class__>
     </item>
     <item>
       <info>
@@ -279,7 +285,7 @@ XML_FILE_3='''\
       <results>
         <E>9</E>
       </results>
-      <__class__>&lt;class 'coma.test.test_experiment.ExampleSimulation'&gt;</__class__>
+      <__class__>coma.test.test_experiment.ExampleSimulation</__class__>
     </item>
   </measurements>
 </experiment>
@@ -316,7 +322,7 @@ JSON_FILE_3='''\
         "results": {
           "E": 0
         },
-        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+        "__class__": "coma.test.test_experiment.ExampleSimulation"
       },
       {
         "info": {
@@ -338,7 +344,7 @@ JSON_FILE_3='''\
         "results": {
           "E": 1
         },
-        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+        "__class__": "coma.test.test_experiment.ExampleSimulation"
       },
       {
         "info": {
@@ -360,7 +366,7 @@ JSON_FILE_3='''\
         "results": {
           "E": 2
         },
-        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+        "__class__": "coma.test.test_experiment.ExampleSimulation"
       },
       {
         "info": {
@@ -382,7 +388,7 @@ JSON_FILE_3='''\
         "results": {
           "E": 3
         },
-        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+        "__class__": "coma.test.test_experiment.ExampleSimulation"
       },
       {
         "info": {
@@ -404,7 +410,7 @@ JSON_FILE_3='''\
         "results": {
           "E": 4
         },
-        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+        "__class__": "coma.test.test_experiment.ExampleSimulation"
       },
       {
         "info": {
@@ -426,7 +432,7 @@ JSON_FILE_3='''\
         "results": {
           "E": 5
         },
-        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+        "__class__": "coma.test.test_experiment.ExampleSimulation"
       },
       {
         "info": {
@@ -448,7 +454,7 @@ JSON_FILE_3='''\
         "results": {
           "E": 6
         },
-        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+        "__class__": "coma.test.test_experiment.ExampleSimulation"
       },
       {
         "info": {
@@ -470,7 +476,7 @@ JSON_FILE_3='''\
         "results": {
           "E": 7
         },
-        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+        "__class__": "coma.test.test_experiment.ExampleSimulation"
       },
       {
         "info": {
@@ -492,7 +498,7 @@ JSON_FILE_3='''\
         "results": {
           "E": 8
         },
-        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+        "__class__": "coma.test.test_experiment.ExampleSimulation"
       },
       {
         "info": {
@@ -514,7 +520,7 @@ JSON_FILE_3='''\
         "results": {
           "E": 9
         },
-        "__class__": "<class 'coma.test.test_experiment.ExampleSimulation'>"
+        "__class__": "coma.test.test_experiment.ExampleSimulation"
       }
     ]
   }
@@ -603,7 +609,7 @@ class ExampleSimulation(object):
     def run(self):
         pass
 
-    def __getstate__(self):
+    def coma_getstate(self):
         i = OrderedDict()
         i['parameters'] = OrderedDict()
         if self.a is not None:
@@ -625,15 +631,15 @@ class TestExperiment(object):
         if os.path.exists(self.d):
             shutil.rmtree(self.d)
 
+        self.c = {}
+        self.c['experiment_index'] = self.fi
+        self.c['archive_default_format'] = self.format
+
         os.mkdir(self.d)
-        i = IndexFile(self.fi, 'experiment', default_format=self.format)
+        i = IndexFile(self.fi, 'experiment', config=self.c)
         i.create()
         i.increment()
         i.increment()
-
-        self.c = Config()
-        self.c.experiment_index = self.fi
-        self.c.default_format = self.format
 
     def tearDown(self):
         if os.path.exists(self.d):
@@ -662,7 +668,7 @@ class TestExperiment(object):
 
     def test_create_experiment_without_id_in_name(self):
         c = copy.copy(self.c)
-        c.experiment_file = 'experiment'
+        c['experiment_file'] = 'experiment'
         
         # create a new experiment
         e = Experiment(self.d, description='Blub', config=c)
@@ -695,10 +701,10 @@ class TestExperiment(object):
 
     def test_create_experiment_without_index_file_1(self):
         c = copy.copy(self.c)
-        c.experiment_index = '__experimenttest.index'
+        c['experiment_index'] = '__experimenttest.index'
         
         e = Experiment(self.d,config=c)
-        self.assertFalse(os.path.exists(c.experiment_index_path))
+        self.assertFalse(os.path.exists(expand_path(c['experiment_index'])))
         self.assertTrue(self.exists('experiment.none'))
         self.assertEquals(e.id, None)
 
@@ -707,10 +713,10 @@ class TestExperiment(object):
 
     def test_create_experiment_without_index_file_2(self):
         c = copy.copy(self.c)
-        c.experiment_index = '__experimenttest.index'
+        c['experiment_index'] = '__experimenttest.index'
 
         e = Experiment(self.d,id=42,config=c)
-        self.assertFalse(os.path.exists(c.experiment_index_path))
+        self.assertFalse(os.path.exists(expand_path(c['experiment_index'])))
         self.assertTrue(self.exists('experiment.000042'))
         self.assertEquals(e.id, 42)
 
@@ -726,7 +732,7 @@ class TestExperiment(object):
 
     def test_load_experiment_without_id(self):
         c = copy.copy(self.c)
-        c.experiment_file = 'experiment'
+        c['experiment_file'] = 'experiment'
 
         fn = self.filename('experiment')
         f = open(fn, 'w')
@@ -755,7 +761,7 @@ class TestExperiment(object):
         os.remove(fn)
 
         c = copy.copy(self.c)
-        c.experiment_file = 'experiment'
+        c['experiment_file'] = 'experiment'
         fn = self.filename('experiment')
         f = open(fn, 'w')
         f.write(files[self.format][1])
@@ -785,7 +791,7 @@ class TestExperiment(object):
 
     def test_load_experiment_without_index_file_1(self):
         c = copy.copy(self.c)
-        c.experiment_index = '__experimenttest.index'
+        c['experiment_index'] = '__experimenttest.index'
 
         fn = self.filename('experiment.000010')
         f = open(fn, 'w')
@@ -798,8 +804,8 @@ class TestExperiment(object):
 
     def test_load_experiment_without_index_file_2(self):
         c = copy.copy(self.c)
-        c.experiment_index = '__experimenttest.index'
-        c.experiment_file = 'experiment'
+        c['experiment_index'] = '__experimenttest.index'
+        c['experiment_file'] = 'experiment'
         
         fn = self.filename('experiment')
         f = open(fn, 'w')
@@ -812,7 +818,7 @@ class TestExperiment(object):
     
     def test_load_experiment_without_index_file_3(self):
         c = copy.copy(self.c)
-        c.experiment_index = '__experimenttest.index'
+        c['experiment_index'] = '__experimenttest.index'
         
         fn = self.filename('experiment.none')
         f = open(fn, 'w')
@@ -825,7 +831,7 @@ class TestExperiment(object):
 
     def test_load_experiment_with_wrong_filename(self):
         c = copy.copy(self.c)
-        c.experiment_file = 'experiment'
+        c['experiment_file'] = 'experiment'
         fn = self.filename('experiment.000010')
         f = open(fn, 'w')
         f.write(files[self.format][0])
@@ -857,7 +863,7 @@ class TestExperiment(object):
 
     def test_load_inactive_experiment_without_id(self):
         c = copy.copy(self.c)
-        c.experiment_file = 'experiment'
+        c['experiment_file'] = 'experiment'
 
         fn = self.filename('experiment')
         f = open(fn, 'w')
@@ -913,7 +919,7 @@ class TestExperiment(object):
 
     def test_standalone_experiment_without_index_file(self):
         c = copy.copy(self.c)
-        c.experiment_index = '__experimenttest.index'
+        c['experiment_index'] = '__experimenttest.index'
 
         e = Experiment(self.d,config=c)
         
@@ -1005,7 +1011,7 @@ class TestExperiment(object):
 
     def test_experiment_with_different_measurement_filename(self):
         c = copy.copy(self.c)
-        c.measurement_file = '${measurement_id}'
+        c['measurement_file'] = '${measurement_id}'
         e = Experiment(self.d, config=c)
         self.run_example_experiment_1(e)
 
@@ -1017,7 +1023,7 @@ class TestExperiment(object):
         # An invalid measurement_file name: the measurement_id is missing
         # In this case, things can't and won't work properly.
         c = copy.copy(self.c)
-        c.measurement_file = 'blah'
+        c['measurement_file'] = 'blah'
         e = Experiment(self.d, config=c)
         self.run_example_experiment_1(e, (0,1))
 
@@ -1784,6 +1790,43 @@ class TestExperiment(object):
             c += 1
         self.assertEqual(c,8)
 
+    def test_load_config_from_default_configfile(self):
+        # by default, if a file 'preferences.conf' exists in the current working
+        # directory or in the user's home directory under ~/.config/coma, then
+        # it is loaded
+        fn = 'preferences.conf'
+        f = open(fn, 'w')
+        f.write(_CONFIG_FILE_1)
+        f.close()
+
+        e = Experiment(self.d)
+        self.assertEqual(e.experiment_index, 'quark')
+        self.assertEqual(e.experiment_file, 'muh.${experiment_id}')
+
+        os.remove(fn)
+
+    def test_prevent_loading_config_from_default_configfile(self):
+        fn = 'preferences.conf'
+        f = open(fn, 'w')
+        f.write(_CONFIG_FILE_1)
+        f.close()
+
+        e = Experiment(self.d, config={})
+        self.assertEqual(e.experiment_index, 'experiment.index')
+        self.assertEqual(e.experiment_file, 'experiment.${experiment_id}')
+
+        os.remove(fn)
+
+    def test_load_config_from_nondefault_configfile(self):
+        fn = self.filename('__pref.conf')
+        f = open(fn, 'w')
+        f.write(_CONFIG_FILE_1)
+        f.close()
+
+        e = Experiment(self.d, config=load_config(fn))
+        self.assertEqual(e.experiment_index, 'quark')
+        self.assertEqual(e.experiment_file, 'muh.${experiment_id}')
+
 class TestExperimentXML(TestExperiment,unittest.TestCase):
     def __init__(self, method='runTest'):
         super(TestExperimentXML, self).__init__(method)
@@ -1813,9 +1856,7 @@ class TestExperimentXMLAndJsonMixed(unittest.TestCase):
         i = IndexFile(self.fi, 'experiment')
         i.create()
 
-        c = Config()
-        c.experiment_index = self.fi
-        
+        c = {'experiment_index': self.fi}
         e = Experiment(self.d, description='Blub', config=c)
         
         self.assertTrue(os.path.exists(os.path.join(self.d, 'coma.index.json')))
@@ -1834,13 +1875,11 @@ class TestExperimentXMLAndJsonMixed(unittest.TestCase):
         self.assertEquals(e.description, 'Blub')
 
     def test_can_use_xml_format(self):
-        i = IndexFile(self.fi, 'experiment', default_format='xml')
+        c = {'archive_default_format': 'xml'}
+        i = IndexFile(self.fi, 'experiment', config=c)
         i.create()
 
-        c = Config()
-        c.experiment_index = self.fi
-        c.default_format = 'xml'
-        
+        c = {'experiment_index': self.fi, 'archive_default_format': 'xml'}
         e = Experiment(self.d, description='Blub', config=c)
         
         self.assertTrue(os.path.exists(os.path.join(self.d, 'coma.index.xml')))
@@ -1886,9 +1925,7 @@ class TestExperimentXMLAndJsonMixed(unittest.TestCase):
             a.save(o)
     
     def test_load_experiment_with_xml_and_json_files(self):
-        c = Config()
-        c.experiment_index = self.fi
-        
+        c = {'experiment_index': self.fi}
         e = Experiment(self.d,config=c)
         
         self.assertTrue(os.path.exists(self.d))

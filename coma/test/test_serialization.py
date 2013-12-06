@@ -1,7 +1,7 @@
 import unittest
 from collections import OrderedDict
 from coma import XMLArchive, XMLArchiveError, JsonArchive, JsonArchiveError, \
-                 Archive, ArchiveError, archive_exists
+                 Archive, ArchiveError, archive_exists, Serializer
 import os
 import math
 import filecmp
@@ -235,6 +235,61 @@ _INVALID_LIST_2_XML='''\
 </measurement>
 '''
 
+_HIERARCHY_XML='''\
+<testhierarchy>
+  <parameters>
+    <c>3</c>
+    <d>4</d>
+    <all>
+      <count>2</count>
+      <item_version>0</item_version>
+      <item>3</item>
+      <item>4</item>
+    </all>
+    <object1>
+      <parameters>
+        <a>30</a>
+        <b>40</b>
+        <all>
+          <count>2</count>
+          <item_version>0</item_version>
+          <item>30</item>
+          <item>40</item>
+        </all>
+      </parameters>
+      <__class__>coma.test.test_serialization.Class1</__class__>
+    </object1>
+  </parameters>
+  <__class__>coma.test.test_serialization.Class2</__class__>
+</testhierarchy>
+'''
+
+_HIERARCHY_JSON='''\
+{
+  "testhierarchy": {
+    "parameters": {
+      "c": 3,
+      "d": 4,
+      "all": [
+        3,
+        4
+      ],
+      "object1": {
+        "parameters": {
+          "a": 30,
+          "b": 40,
+          "all": [
+            30,
+            40
+          ]
+        },
+        "__class__": "coma.test.test_serialization.Class1"
+      }
+    },
+    "__class__": "coma.test.test_serialization.Class2"
+  }
+}'''
+
 test_data = \
 {
     'simple': OrderedDict([
@@ -283,15 +338,69 @@ test_xml = \
     'invalid_1': _INVALID_1_XML,
     'list': _LIST_XML,
     'invalid_list_1': _INVALID_LIST_1_XML,
-    'invalid_list_2': _INVALID_LIST_2_XML
+    'invalid_list_2': _INVALID_LIST_2_XML,
+    'hierarchy': _HIERARCHY_XML
 }
 
 test_json = \
 {
     'simple': _SIMPLE_JSON,
     'invalid_1': _INVALID_1_JSON,
-    'list': _LIST_JSON
+    'list': _LIST_JSON,
+    'hierarchy': _HIERARCHY_JSON
 }
+
+# TODO: test MemoryArchive
+
+class Class1(object):
+    def __init__(self, a=0, b=0):
+        self.a = a
+        self.b = b
+
+    def __getstate__(self):
+        o = OrderedDict()
+        o['parameters'] = OrderedDict()
+        o['parameters']['a'] = self.a
+        o['parameters']['b'] = self.b
+        o['parameters']['all'] = [self.a,self.b]
+        return o
+    
+    def __setstate__(self, o):
+        self.a = o['parameters']['a']
+        self.b = o['parameters']['b']
+
+class Class2(object):
+    def __init__(self, c=0, d=0):
+        self.c = c
+        self.d = d
+        self.object1 = Class1()
+
+    def __getstate__(self):
+        o = OrderedDict()
+        o['parameters'] = OrderedDict()
+        o['parameters']['c'] = self.c
+        o['parameters']['d'] = self.d
+        o['parameters']['all'] = [self.c,self.d]
+        o['parameters']['object1'] = self.object1
+        return o
+
+    def __setstate__(self, o):
+        self.c = o['parameters']['c']
+        self.d = o['parameters']['d']
+        self.object1 = o['parameters']['object1']
+
+class Class3(object):
+    def __init__(self, a=0, b=0):
+        self.a = a
+        self.b = b
+
+    def coma_getstate(self):
+        o = OrderedDict()
+        o['parameters'] = OrderedDict()
+        o['parameters']['a'] = self.a
+        o['parameters']['b'] = self.b
+        o['parameters']['all'] = [self.a,self.b]
+        return o
 
 class TestXMLArchive(unittest.TestCase):
     def test_dump_simple(self):
@@ -382,6 +491,40 @@ class TestXMLArchive(unittest.TestCase):
         self.assertEqual(d[1:], d2[1:])
         self.assertTrue(math.isnan(d[0]))
         self.assertTrue(math.isnan(d2[0]))
+
+    def test_serialize_and_dump_class_hierarchy(self):
+        o = Class2(3,4)
+        o.object1.a = 30
+        o.object1.b = 40
+
+        c = {'serializer_getstate': '__getstate__'}
+        a = XMLArchive('testhierarchy', config=c)
+        s = a.dumps(o)
+        self.assertEqual(test_xml['hierarchy'], s)
+
+    def test_load_but_do_not_restore_class_hierarchy(self):
+        a = XMLArchive('testhierarchy')
+        o = a.loads(test_xml['hierarchy'])
+        self.assertEquals(o['parameters']['c'], 3)
+        self.assertEquals(o['parameters']['d'], 4)
+        self.assertEquals(o['parameters']['object1']['parameters']['a'], 30)
+        self.assertEquals(o['parameters']['object1']['parameters']['b'], 40)
+
+    def test_load_and_restore_class_hierarchy(self):
+        # At least for the time being, we need to set the serializer by hand;
+        # full object restore is not supported via the config dictionary
+        c = {
+            'serializer_getstate': '__getstate__',
+            'serializer_setstate': '__setstate__'
+        }
+        s = Serializer(restore_objects=True, config=c)
+        a = XMLArchive('testhierarchy')
+        a.serializer = s
+        o = a.loads(test_xml['hierarchy'])
+        self.assertEquals(o.c, 3)
+        self.assertEquals(o.d, 4)
+        self.assertEquals(o.object1.a, 30)
+        self.assertEquals(o.object1.b, 40)
 
 class TestJsonArchive(unittest.TestCase):
     def test_dump_simple(self):
@@ -479,6 +622,40 @@ class TestJsonArchive(unittest.TestCase):
         self.assertEqual(d[1:], d2[1:])
         self.assertTrue(math.isnan(d[0]))
         self.assertTrue(math.isnan(d2[0]))
+
+    def test_serialize_and_dump_class_hierarchy(self):
+        o = Class2(3,4)
+        o.object1.a = 30
+        o.object1.b = 40
+
+        c = {'serializer_getstate': '__getstate__'}
+        a = JsonArchive('testhierarchy', config=c)
+        s = a.dumps(o)
+        self.assertEqual(test_json['hierarchy'], s)
+
+    def test_load_but_do_not_restore_class_hierarchy(self):
+        a = JsonArchive('testhierarchy')
+        o = a.loads(test_json['hierarchy'])
+        self.assertEquals(o['parameters']['c'], 3)
+        self.assertEquals(o['parameters']['d'], 4)
+        self.assertEquals(o['parameters']['object1']['parameters']['a'], 30)
+        self.assertEquals(o['parameters']['object1']['parameters']['b'], 40)
+
+    def test_load_and_restore_class_hierarchy(self):
+        # At least for the time being, we need to set the serializer by hand;
+        # full object restore is not supported via the config dictionary
+        c = {
+            'serializer_getstate': '__getstate__',
+            'serializer_setstate': '__setstate__'
+        }
+        s = Serializer(restore_objects=True, config=c)
+        a = JsonArchive('testhierarchy')
+        a.serializer = s
+        o = a.loads(test_json['hierarchy'])
+        self.assertEquals(o.c, 3)
+        self.assertEquals(o.d, 4)
+        self.assertEquals(o.object1.a, 30)
+        self.assertEquals(o.object1.b, 40)
 
 class TestArchive(unittest.TestCase):
     def test_archive_cannot_be_constructed_when_multiple_archive_files_are_present(self):
@@ -642,3 +819,140 @@ class TestArchive(unittest.TestCase):
             a.save(a.load(), format='invalid')
 
         os.remove(f1)
+
+    def test_use_archive_with_config_object(self):
+        f1 = 'testarchive1.xml'
+        f1_ref = 'testarchive1_reference.xml'
+        f = open(f1_ref, 'w')
+        f.write(test_xml['list'])
+        f.close()
+        
+        c = {'archive_default_format': 'xml'}
+        a = Archive('testarchive1', 'measurement', indent=8, config=c)
+        a.save(test_data['list'])
+        
+        self.assertTrue(os.path.exists(f1))
+        self.assertTrue(filecmp.cmp(f1, f1_ref, shallow=False))
+
+        for f in [f1,f1_ref]:
+            os.remove(f)
+
+class TestSerializer(unittest.TestCase):
+    def test_serialize_an_object(self):
+        o = Class3(3,4)
+        s = Serializer()
+        d = s.serialize(o)
+
+        self.assertTrue(d.has_key('parameters'));
+        self.assertTrue(d.has_key('__class__'));
+        self.assertEqual(d['__class__'], 'coma.test.test_serialization.Class3');
+        p = d['parameters']
+        self.assertTrue(p.has_key('a'));
+        self.assertTrue(p.has_key('b'));
+        self.assertTrue(p.has_key('all'));
+        self.assertEqual(p['a'], 3);
+        self.assertEqual(p['b'], 4);
+        self.assertEqual(p['all'], [3,4]);
+
+    def test_serialize_an_object_with_a_different_serialization_method(self):
+        o = Class2(5,6)
+        s = Serializer(getstate='__getstate__')
+        d = s.serialize(o)
+
+        self.assertTrue(d.has_key('parameters'));
+        self.assertTrue(d.has_key('__class__'));
+        self.assertEqual(d['__class__'], 'coma.test.test_serialization.Class2');
+        p = d['parameters']
+        self.assertTrue(p.has_key('c'));
+        self.assertTrue(p.has_key('d'));
+        self.assertTrue(p.has_key('object1'));
+        self.assertTrue(p.has_key('all'));
+        self.assertEqual(p['c'], 5);
+        self.assertEqual(p['d'], 6);
+        self.assertEqual(p['all'], [5,6]);
+        self.assertTrue(isinstance(p['object1'], Class1));
+
+    def test_serialize_an_object_with_wrong_serialization_method_fails(self):
+        o = Class3(3,4)
+        s = Serializer(getstate='__getstate__')
+        with self.assertRaises(AttributeError):
+            s.serialize(o)
+
+    def test_restore_by_default_does_nothing(self):
+        d = OrderedDict([('parameters',OrderedDict([('a',10),('b',20)]))])
+        s = Serializer()
+        o = s.restore(d)
+        self.assertTrue(o == d)
+        self.assertTrue(o is d)
+
+    def test_restore_an_object(self):
+        d = OrderedDict([
+            ('parameters',OrderedDict([('c',50),('d',90),('object1','placeholder')])),
+            ('__class__', 'coma.test.test_serialization.Class2')
+        ])
+        s = Serializer(restore_objects=True, getstate='__getstate__', setstate='__setstate__')
+        o = s.restore(d)
+        self.assertTrue(isinstance(o, Class2))
+        self.assertEqual(o.c, 50)
+        self.assertEqual(o.d, 90)
+
+    def test_restore_an_object_from_incorrect_or_incomplete_dict(self):
+        s = Serializer(restore_objects=True, getstate='__getstate__', setstate='__setstate__')
+        
+        # If the dict does not have '__class__' field, it is just passed through
+        d = OrderedDict([('parameters',OrderedDict([('a',10),('b',20)]))])
+        o = s.restore(d)
+        self.assertTrue(o == d)
+        self.assertTrue(o is d)
+
+        # Nonexistent module fails
+        d = OrderedDict([
+            ('parameters', OrderedDict([('a',10),('b',20)])),
+            ('__class__', 'blub.Muh')
+        ])
+        with self.assertRaises(ImportError):
+            s.restore(d)
+        
+        # Nonexistent class fails
+        d = OrderedDict([
+            ('parameters', OrderedDict([('a',10),('b',20)])),
+            ('__class__', '__main__.Muh')
+        ])
+        with self.assertRaises(AttributeError):
+            s.restore(d)
+        
+        # Correct class, but wrong / nonexistent serialization method fails
+        d = OrderedDict([
+            ('parameters', OrderedDict([('a',10),('b',20)])),
+            ('__class__', 'coma.test.test_serialization.Class3')
+        ])
+        with self.assertRaises(AttributeError):
+            s.restore(d)
+    
+    def test_serialize_and_restore_an_object(self):
+        s = Serializer(restore_objects=True, getstate='__getstate__', setstate='__setstate__')
+        o1 = Class2(8,9)
+        d = s.serialize(o1)
+        o2 = s.restore(d)
+        
+        # Note that here object1 was never serialized, it was just passed
+        # around as is. Serializing / restoring a whole object tree recursively
+        # is not Serializer's job.
+        self.assertTrue(isinstance(o1.object1, Class1))
+        self.assertTrue(isinstance(o2.object1, Class1))
+        self.assertEqual(o1.__dict__, o2.__dict__)
+
+    def test_use_serializer_with_config_object(self):
+        d = OrderedDict([
+            ('parameters',OrderedDict([('c',50),('d',90),('object1','placeholder')])),
+            ('__class__', 'coma.test.test_serialization.Class2')
+        ])
+        c = {
+            'serializer_getstate': '__getstate__',
+            'serializer_setstate': '__setstate__'
+        }
+        s = Serializer(restore_objects=True, config=c)
+        o = s.restore(d)
+        self.assertTrue(isinstance(o, Class2))
+        self.assertEqual(o.c, 50)
+        self.assertEqual(o.d, 90)

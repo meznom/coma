@@ -6,7 +6,7 @@ import numpy as np
 from .serialization import Archive, archive_exists
 from .util import current_date_as_string
 from .indexfile import IndexFile
-from .config import Config
+from .config import expand_path, load_config
 from .measurement import FileMeasurement, MemoryMeasurement
 
 class ExperimentError(Exception):
@@ -93,7 +93,7 @@ class ParameterSet(object):
         return s
 
 class Experiment(object):
-    def __init__(self, dir, id=None, description=None, tags=[], config=Config()):
+    def __init__(self, dir, id=None, description=None, tags=[], config=None):
         self.dir = dir
         self.id = id
         self.archive = None
@@ -101,19 +101,29 @@ class Experiment(object):
         self.tags = tags
         self.start_date = None
         self.end_date = None
-        self.config = config
         self._measurements = None
         self.pset_definition = OrderedDict()
         self.psets = []
 
+        # Default values for configurable properties
+        self.experiment_file = 'experiment.${experiment_id}'
+        self.experiment_index = 'experiment.index'
+        self.measurement_file = 'measurement.${measurement_id}'
+        self.measurement_index = 'measurement.index'
+
+        if config is None:
+            config = load_config()
+
+        self._configure(config)
+        self.config = config
+
         if not os.path.exists(self.dir):
             os.mkdir(self.dir)
         
-        self.eindex = IndexFile(self.config.experiment_index_path, 'experiment', 
-                                default_format=self.config.default_format)
-        mindexfile = os.path.join(self.dir,self.config.measurement_index)
-        self.mindex = IndexFile(mindexfile, 'measurement', 
-                                default_format=self.config.default_format)
+        eindexfile = expand_path(self.experiment_index)
+        self.eindex = IndexFile(eindexfile, 'experiment', config=config)
+        mindexfile = os.path.join(self.dir, self.measurement_index)
+        self.mindex = IndexFile(mindexfile, 'measurement', config=config)
 
         # Retrieve files matching the experiment_file config variable.
         #
@@ -133,7 +143,7 @@ class Experiment(object):
             if self.id is None and self.eindex.exists():
                 self.id = self.eindex.increment()
             f = os.path.join(self.dir,self._experiment_filename())
-            self.archive = Archive(f, 'experiment', default_format=self.config.default_format)
+            self.archive = Archive(f, 'experiment', config=config)
             self.mindex.create()
             self.save()
             self.load()
@@ -141,7 +151,7 @@ class Experiment(object):
             if self.id is None and fs[0][0] != 0:
                 self.id = fs[0][0]
             f = os.path.join(self.dir, fs[0][1])
-            self.archive = Archive(f, 'experiment', default_format=self.config.default_format)
+            self.archive = Archive(f, 'experiment', config=config)
             self.load()
         else:
             d = dict(fs)
@@ -149,8 +159,15 @@ class Experiment(object):
                 raise ExperimentError('Found multiple experiment files, non of ' +
                                       'which match the provided experiment id')
             f = os.path.join(self.dir, d[self.id])
-            self.archive = Archive(f, 'experiment', default_format=self.config.default_format)
+            self.archive = Archive(f, 'experiment', config=config)
             self.load()
+
+    def _configure(self, config):
+        props = ['experiment_index','measurement_index',
+                 'experiment_file','measurement_file']
+        for p in props:
+            if config.has_key(p):
+                setattr(self, p, config[p])
 
     def save(self):
         o = OrderedDict()
@@ -402,7 +419,7 @@ class Experiment(object):
         idstr = 'none'
         if isinstance(self.id, int):
             idstr = '{:06d}'.format(self.id)
-        s = self.config.experiment_file
+        s = self.experiment_file
         s = Template(s)
         s = s.substitute(experiment_id=idstr)
         return s
@@ -411,16 +428,16 @@ class Experiment(object):
         idstr = 'none'
         if isinstance(mid, int):
             idstr = '{:06d}'.format(mid)
-        s = self.config.measurement_file
+        s = self.measurement_file
         s = Template(s)
         s = s.substitute(measurement_id=idstr)
         return s
 
     def _matching_experiment_files(self):
-        return self._matching_files(self.config.experiment_file, 'experiment_id')
+        return self._matching_files(self.experiment_file, 'experiment_id')
 
     def _matching_measurement_files(self):
-        return self._matching_files(self.config.measurement_file, 'measurement_id')
+        return self._matching_files(self.measurement_file, 'measurement_id')
 
     def _matching_files(self, pattern, sub):
         # Build a regular expression from pattern
