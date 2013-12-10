@@ -290,7 +290,7 @@ class Experiment(object):
                 if mid < 1 or mid>last_mid:
                     continue
                 f = os.path.join(self.dir, f)
-                a = Archive(f)
+                a = Archive(f,'measurement')
                 os.remove(a.filename)
         else:
             self._measurements = []

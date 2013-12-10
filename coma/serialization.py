@@ -75,14 +75,32 @@ class XMLArchiveError(Exception):
     pass
 
 class XMLArchive(object):
-    def __init__(self, root_tag=None, indent=2, config=None):
-        self.root_tag = root_tag
-        self.serializer = Serializer(config=config)
-        self.pretty_print = False
-        self.indent = ''
+    def __init__(self, archive_name, pretty_print=None, indent=None, config=None):
+        # defaults for pretty_print and indent
+        _pretty_print = True
+        _indent = 2
+        
+        # read relevant config options
+        if config is not None:
+            if config.has_key('archive_pretty_print'):
+                p = config['archive_pretty_print']
+                if p is True or p is False:
+                    _pretty_print = p
+        
+        # __init__ arguments---if specified (i.e. not None)---overwrite config
+        # options
+        if pretty_print is not None:
+            _pretty_print = pretty_print
         if indent is not None:
-            self.pretty_print = True
-            self.indent = ' ' * indent
+            _indent = indent
+        
+        if _pretty_print is False:
+            _indent = 0
+
+        self.archive_name = archive_name
+        self.serializer = Serializer(config=config)
+        self.pretty_print = _pretty_print
+        self.indent = ' ' * _indent
         # this is taken from json.scanner
         self.number_re = re.compile(
             r'^(-?(?:0|[1-9]\d*))(\.\d+)?([eE][-+]?\d+)?$',
@@ -119,7 +137,7 @@ class XMLArchive(object):
             et.write(f)
 
     def _dump_to_element(self, o):
-        tag = self.root_tag
+        tag = self.archive_name
         if tag is None:
             tag = 'serialization'
         return self.encode(tag, o)
@@ -134,9 +152,9 @@ class XMLArchive(object):
         return self._load_from_element(e)
 
     def _load_from_element(self, e):
-        if self.root_tag is not None and e.tag != self.root_tag:
+        if self.archive_name is not None and e.tag != self.archive_name:
             raise XMLArchiveError('Expected XML root element "{}", but found "{}"'
-                    .format(self.root_tag, e.tag))
+                    .format(self.archive_name, e.tag))
         return self.decode(e)
 
     def encode(self, tag, o):
@@ -219,13 +237,31 @@ class JsonArchiveError(Exception):
     pass
 
 class JsonArchive(object):
-    def __init__(self, root_tag=None, indent=2, config=None):
-        self.root_tag = root_tag
+    def __init__(self, archive_name, pretty_print=None, indent=None, config=None):
+        # defaults for pretty_print and indent
+        _pretty_print = True
+        _indent = 2
+        
+        # read relevant config options
+        if config is not None:
+            if config.has_key('archive_pretty_print'):
+                p = config['archive_pretty_print']
+                if p is True or p is False:
+                    _pretty_print = p
+        
+        # __init__ arguments---if specified (i.e. not None)---overwrite config
+        # options
+        if pretty_print is not None:
+            _pretty_print = pretty_print
+        if indent is not None:
+            _indent = indent
+
+        self.archive_name = archive_name
         self.serializer = Serializer(config=config)
-        self.indent = indent
+        self.indent = _indent
         self.separators = (',',': ')
-        if self.indent is None:
-            # no pretty printing
+        if _pretty_print is False:
+            self.indent = None
             self.separators = (',',':')
 
     def dumpfile(self, o, filename):
@@ -240,15 +276,15 @@ class JsonArchive(object):
         return o
         
     def dumps(self, o):
-        if self.root_tag is not None:
-            o = OrderedDict([(self.root_tag, o)])
+        if self.archive_name is not None:
+            o = OrderedDict([(self.archive_name, o)])
         return json.dumps(o, default=self.serializer.serialize, 
                              indent=self.indent, 
                              separators=self.separators)
 
     def dump(self, o, f):
-        if self.root_tag is not None:
-            o = OrderedDict([(self.root_tag, o)])
+        if self.archive_name is not None:
+            o = OrderedDict([(self.archive_name, o)])
         json.dump(o, f, default=self.serializer.serialize,
                         indent=self.indent, 
                         separators=self.separators)
@@ -263,11 +299,11 @@ class JsonArchive(object):
     def _load(self, s_or_f, json_load):
         try:
             o = json_load(s_or_f, object_pairs_hook=lambda d: self.serializer.restore(OrderedDict(d)))
-            if self.root_tag is not None:
-                if not isinstance(o, dict) or not o.has_key(self.root_tag):
+            if self.archive_name is not None:
+                if not isinstance(o, dict) or not o.has_key(self.archive_name):
                     raise JsonArchiveError('Did not find top-level entry "{}" in JSON '
-                                           'string'.format(self.root_tag))
-                o = o[self.root_tag]
+                                           'string'.format(self.archive_name))
+                o = o[self.archive_name]
             return o
         except ValueError as e:
             raise JsonArchiveError(e.message)
@@ -279,18 +315,22 @@ class Archive(object):
     formats = ['json','xml']
     classes = {'json': JsonArchive, 'xml': XMLArchive}
 
-    def __init__(self, basename, archive_name=None, indent=2,
-                 default_format='json', config=None):
-        self.basename = basename
-        self.name = archive_name
-        self.default_format = default_format
-        self.indent = indent
-        self.config = config
+    def __init__(self, filename, archive_name, pretty_print=None, indent=None,
+                 default_format=None, config=None):
+        _default_format = 'json'
         if config is not None:
             if config.has_key('archive_default_format'):
-                self.default_format = config['archive_default_format']
+                _default_format = config['archive_default_format']
+        if default_format is not None:
+            _default_format = default_format
+        
+        self.name = archive_name
+        self.default_format = _default_format
+        self.pretty_print = pretty_print
+        self.indent = indent
+        self.config = config
 
-        self.format = self._infer_format()
+        self.basename,self.format = self._basename_and_format(filename)
         self.filename = self.basename + '.' + self.format
         self._a = self._archive_factory(self.format)
 
@@ -309,20 +349,27 @@ class Archive(object):
         if not self.classes.has_key(format):
             raise ArchiveError('Unsupported archive format: {}'.format(format))
         A = self.classes[format]
-        return A(self.name, self.indent, config=self.config)
+        return A(self.name, self.pretty_print, self.indent, config=self.config)
     
-    def _infer_format(self):
+    def _basename_and_format(self, filename):
+        # If filename ends with a supported format, return basename and format
+        # accordingly, otherwise treat filename as the basename and see whether
+        # an archive with one of the supported formats already exists.
+        # Otherwise return default format.
+        for f in self.formats:
+            if filename.endswith('.' + f):
+                return filename[:-(len(f)+1)],f
         fs = []
         for f in self.formats:
-            if os.path.exists(self.basename + '.' + f):
+            if os.path.exists(filename + '.' + f):
                 fs.append(f)
         if len(fs) > 1:
             raise ArchiveError('Found multiple files for archive "{}"'
-                               .format(self.basename))
+                               .format(filename))
         elif len(fs) == 1:
-            return fs[0]
+            return filename,fs[0]
         else:
-            return self.default_format
+            return filename,self.default_format
 
 def archive_exists(basename):
     fs = []

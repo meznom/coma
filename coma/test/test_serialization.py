@@ -8,6 +8,7 @@ from coma import XMLArchive, XMLArchiveError, JsonArchive, JsonArchiveError, \
 import os
 import math
 import filecmp
+import shutil
 
 _SIMPLE_XML='''\
 <measurement>
@@ -293,6 +294,10 @@ _HIERARCHY_JSON='''\
   }
 }'''
 
+_NO_PRETTY_PRINTING_XML='<measurement><info><program>ExamplePythonSimulation</program><version>32ef404-dirty</version><measurement_id>3</measurement_id><measurement_dir>./000005</measurement_dir><empty /><start_date>2013-04-06T04:40:37Z</start_date><end_date>2013-04-06T04:40:37Z</end_date></info><parameters><N>2</N><m><N_row>3</N_row><N_col>5</N_col></m></parameters><results><average>0.5</average></results></measurement>'
+
+_NO_PRETTY_PRINTING_JSON='{"measurement":{"info":{"program":"ExamplePythonSimulation","version":"32ef404-dirty","measurement_id":3,"measurement_dir":"./000005","empty":null,"start_date":"2013-04-06T04:40:37Z","end_date":"2013-04-06T04:40:37Z"},"parameters":{"N":2,"m":{"N_row":3,"N_col":5}},"results":{"average":0.5}}}'
+
 test_data = \
 {
     'simple': OrderedDict([
@@ -342,7 +347,8 @@ test_xml = \
     'list': _LIST_XML,
     'invalid_list_1': _INVALID_LIST_1_XML,
     'invalid_list_2': _INVALID_LIST_2_XML,
-    'hierarchy': _HIERARCHY_XML
+    'hierarchy': _HIERARCHY_XML,
+    'no_pretty_printing': _NO_PRETTY_PRINTING_XML
 }
 
 test_json = \
@@ -350,10 +356,13 @@ test_json = \
     'simple': _SIMPLE_JSON,
     'invalid_1': _INVALID_1_JSON,
     'list': _LIST_JSON,
-    'hierarchy': _HIERARCHY_JSON
+    'hierarchy': _HIERARCHY_JSON,
+    'no_pretty_printing': _NO_PRETTY_PRINTING_JSON
 }
 
-# TODO: test MemoryArchive
+# TODO: Test MemoryArchive.
+# TODO: These tests could certainly be simplified. E.g. TestXMLArchive and
+# TestJsonArchive are mostly equivalent and even overlap with TestArchive.
 
 class Class1(object):
     def __init__(self, a=0, b=0):
@@ -406,18 +415,33 @@ class Class3(object):
         return o
 
 class TestXMLArchive(unittest.TestCase):
+    def setUp(self):
+        base_dir = os.path.dirname(__file__)
+        self.d = os.path.join(base_dir, 'testxmlarchive')
+        
+        if os.path.exists(self.d):
+            shutil.rmtree(self.d)
+        os.mkdir(self.d)
+
+    def tearDown(self):
+        if os.path.exists(self.d):
+            shutil.rmtree(self.d)
+
+    def filename(self, f):
+        return os.path.join(self.d, f)
+
     def test_dump_simple(self):
         a = XMLArchive('measurement')
         s = a.dumps(test_data['simple'])
         self.assertEqual(test_xml['simple'], s)
 
     def test_dump_simple_no_pretty_print(self):
-        a = XMLArchive('measurement', indent=None)
+        a = XMLArchive('measurement', pretty_print=False)
         s = a.dumps(test_data['simple'])
         self.assertEqual(test_xml['simple'].replace('\n','').replace(' ',''), s.replace(' ',''))
 
     def test_dump_simple_to_file(self):
-        name = 'test_serialization.xml'
+        name = self.filename('test_serialization.xml')
         
         a = XMLArchive('measurement')
         f = open(name, 'w')
@@ -428,7 +452,7 @@ class TestXMLArchive(unittest.TestCase):
         f.close()
         self.assertEqual(test_xml['simple'], s)
 
-        a = XMLArchive('measurement', indent=None)
+        a = XMLArchive('measurement', pretty_print=False)
         f = open(name, 'w')
         a.dump(test_data['simple'], f)
         f.close()
@@ -436,8 +460,6 @@ class TestXMLArchive(unittest.TestCase):
         s = f.read()
         f.close()
         self.assertEqual(test_xml['simple'].replace('\n','').replace(' ',''), s.replace(' ',''))
-
-        os.remove(name)
 
     def test_dump_list(self):
         a = XMLArchive('measurement', indent=8)
@@ -450,7 +472,8 @@ class TestXMLArchive(unittest.TestCase):
             a.loads(test_xml['simple'])
 
         a1 = XMLArchive('measurement')
-        a2 = XMLArchive()
+        # 'None' works for any root_tag, generally not recommended
+        a2 = XMLArchive(None)
         d1 = a1.loads(test_xml['simple'])
         d2 = a2.loads(test_xml['simple'])
 
@@ -486,7 +509,7 @@ class TestXMLArchive(unittest.TestCase):
         d = [float('nan'), float('inf'), -float('inf')]
         xml = '<test><count>3</count><item_version>0</item_version><item>NaN</item><item>Infinity</item><item>-Infinity</item></test>'
         
-        a = XMLArchive('test', indent=None)
+        a = XMLArchive('test', pretty_print=False)
         s = a.dumps(d)
         self.assertEqual(xml, s)
 
@@ -529,19 +552,68 @@ class TestXMLArchive(unittest.TestCase):
         self.assertEquals(o.object1.a, 30)
         self.assertEquals(o.object1.b, 40)
 
+    def test_no_pretty_printing_with_config_object(self):
+        f1 = self.filename('testarchive1.xml')
+        f1_ref = self.filename('testarchive1_reference.xml')
+        f = open(f1_ref, 'w')
+        f.write(test_xml['no_pretty_printing'])
+        f.close()
+        
+        c = {'archive_default_format': 'xml', 'archive_pretty_print': False}
+        a = XMLArchive('measurement', config=c)
+        f = open(f1, 'w')
+        a.dump(test_data['simple'], f)
+        f.close()
+        
+        self.assertTrue(os.path.exists(f1))
+        self.assertTrue(filecmp.cmp(f1, f1_ref, shallow=False))
+        
+    def test_no_pretty_printing_with_invalid_config_object(self):
+        f1 = self.filename('testarchive1.xml')
+        f1_ref = self.filename('testarchive1_reference.xml')
+        f = open(f1_ref, 'w')
+        f.write(test_xml['simple'])
+        f.close()
+
+        # Invalid value for option. Does not throw an error right now, just
+        # does not do anything.
+        c = {'archive_default_format': 'xml', 'archive_pretty_print': 'muh'}
+        a = XMLArchive('measurement', config=c)
+        f = open(f1, 'w')
+        a.dump(test_data['simple'], f)
+        f.close()
+
+        self.assertTrue(os.path.exists(f1))
+        self.assertTrue(filecmp.cmp(f1, f1_ref, shallow=False))
+
 class TestJsonArchive(unittest.TestCase):
+    def setUp(self):
+        base_dir = os.path.dirname(__file__)
+        self.d = os.path.join(base_dir, 'testjsonarchive')
+        
+        if os.path.exists(self.d):
+            shutil.rmtree(self.d)
+        os.mkdir(self.d)
+
+    def tearDown(self):
+        if os.path.exists(self.d):
+            shutil.rmtree(self.d)
+
+    def filename(self, f):
+        return os.path.join(self.d, f)
+
     def test_dump_simple(self):
         a = JsonArchive('measurement')
         s = a.dumps(test_data['simple'])
         self.assertEqual(test_json['simple'], s)
 
     def test_dump_simple_no_pretty_print(self):
-        a = JsonArchive('measurement', indent=None)
+        a = JsonArchive('measurement', pretty_print=False)
         s = a.dumps(test_data['simple'])
         self.assertEqual(test_json['simple'].replace('\n','').replace(' ',''), s.replace(' ',''))
 
     def test_dump_simple_to_file(self):
-        name = 'test_serialization.json'
+        name = self.filename('test_serialization.json')
         
         a = JsonArchive('measurement')
         f = open(name, 'w')
@@ -552,7 +624,7 @@ class TestJsonArchive(unittest.TestCase):
         f.close()
         self.assertEqual(test_json['simple'], s)
 
-        a = JsonArchive('measurement', indent=None)
+        a = JsonArchive('measurement', pretty_print=False)
         f = open(name, 'w')
         a.dump(test_data['simple'], f)
         f.close()
@@ -560,8 +632,6 @@ class TestJsonArchive(unittest.TestCase):
         s = f.read()
         f.close()
         self.assertEqual(test_json['simple'].replace('\n','').replace(' ',''), s.replace(' ',''))
-
-        os.remove(name)
 
     def test_dump_list(self):
         a = JsonArchive('measurement', indent=8)
@@ -574,7 +644,9 @@ class TestJsonArchive(unittest.TestCase):
             a.loads(test_json['simple'])
 
         a1 = JsonArchive('measurement')
-        a2 = JsonArchive()
+        # Use 'None' to read any JSON file, regardless of top level "tag";
+        # generally it's not recommended to use this.
+        a2 = JsonArchive(None)
         d1 = a1.loads(test_json['simple'])
         d2 = a2.loads(test_json['simple'])
 
@@ -603,12 +675,12 @@ class TestJsonArchive(unittest.TestCase):
         self.assertEqual(test_json['simple'], s)
 
         # now without root_tag
-        a = JsonArchive()
+        a = JsonArchive(None)
         s = a.dumps(test_data['simple'])
         d = a.loads(s)
         self.assertEqual(test_data['simple'], d)
 
-        a = JsonArchive()
+        a = JsonArchive(None)
         d = a.loads(test_json['simple'])
         s = a.dumps(d)
         self.assertEqual(test_json['simple'], s)
@@ -617,7 +689,7 @@ class TestJsonArchive(unittest.TestCase):
         d = [float('nan'), float('inf'), -float('inf')]
         json = '{"test":[NaN,Infinity,-Infinity]}'
         
-        a = JsonArchive('test', indent=None)
+        a = JsonArchive('test', pretty_print=False)
         s = a.dumps(d)
         self.assertEqual(json, s)
 
@@ -660,60 +732,114 @@ class TestJsonArchive(unittest.TestCase):
         self.assertEquals(o.object1.a, 30)
         self.assertEquals(o.object1.b, 40)
 
+    def test_no_pretty_printing_with_config_object(self):
+        f1 = self.filename('testarchive1.json')
+        f1_ref = self.filename('testarchive1_reference.json')
+        f = open(f1_ref, 'w')
+        f.write(test_xml['no_pretty_printing'])
+        f.close()
+        
+        c = {'archive_default_format': 'json', 'archive_pretty_print': False}
+        a = XMLArchive('measurement', config=c)
+        f = open(f1, 'w')
+        a.dump(test_data['simple'], f)
+        f.close()
+        
+        self.assertTrue(os.path.exists(f1))
+        self.assertTrue(filecmp.cmp(f1, f1_ref, shallow=False))
+        
+    def test_no_pretty_printing_with_invalid_config_object(self):
+        f1 = self.filename('testarchive1.json')
+        f1_ref = self.filename('testarchive1_reference.json')
+        f = open(f1_ref, 'w')
+        f.write(test_xml['simple'])
+        f.close()
+
+        # Invalid value for option. Does not throw an error right now, just
+        # does not do anything.
+        c = {'archive_default_format': 'json', 'archive_pretty_print': 'muh'}
+        a = XMLArchive('measurement', config=c)
+        f = open(f1, 'w')
+        a.dump(test_data['simple'], f)
+        f.close()
+
+        self.assertTrue(os.path.exists(f1))
+        self.assertTrue(filecmp.cmp(f1, f1_ref, shallow=False))
+
 class TestArchive(unittest.TestCase):
+    def setUp(self):
+        base_dir = os.path.dirname(__file__)
+        self.d = os.path.join(base_dir, 'testarchive')
+        
+        if os.path.exists(self.d):
+            shutil.rmtree(self.d)
+        os.mkdir(self.d)
+
+    def tearDown(self):
+        if os.path.exists(self.d):
+            shutil.rmtree(self.d)
+
+    def filename(self, f):
+        return os.path.join(self.d, f)
+
     def test_archive_cannot_be_constructed_when_multiple_archive_files_are_present(self):
-        f1 = 'testarchive.xml'
+        f1 = self.filename('testarchive.xml')
         f = open(f1, 'w')
         f.write(test_xml['simple'])
         f.close()
-        f2 = 'testarchive.json'
+        f2 = self.filename('testarchive.json')
         f = open(f2, 'w')
         f.write(test_json['simple'])
         f.close()
 
         with self.assertRaises(ArchiveError):
-            Archive('testarchive', 'measurement')
-
-        for f in [f1,f2]:
-            os.remove(f)
+            Archive(self.filename('testarchive'), 'measurement')
 
     def test_archive_cannot_be_constructed_with_invalid_format(self):
         with self.assertRaises(ArchiveError):
-            Archive('testarchive', default_format='txt')
+            Archive(self.filename('testarchive'), 'test', default_format='txt')
 
         with self.assertRaises(ArchiveError):
-            Archive('testarchive', default_format='.xml')
+            Archive(self.filename('testarchive'), 'test', default_format='.xml')
 
     def test_archive_exists(self):
-        self.assertFalse(archive_exists('testarchive'))
+        n = self.filename('testarchive')
+        
+        self.assertFalse(archive_exists(n))
 
-        open('testarchive','w').close()
-        self.assertFalse(archive_exists('testarchive'))
-        os.remove('testarchive')
+        f = self.filename('testarchive')
+        open(f,'w').close()
+        self.assertFalse(archive_exists(n))
+        os.remove(f)
 
-        open('testarchive.txt','w').close()
-        self.assertFalse(archive_exists('testarchive'))
-        os.remove('testarchive.txt')
+        f = self.filename('testarchive.txt')
+        open(f,'w').close()
+        self.assertFalse(archive_exists(n))
+        os.remove(f)
 
-        open('testarchive.xml','w').close()
-        self.assertTrue(archive_exists('testarchive'))
-        os.remove('testarchive.xml')
+        f = self.filename('testarchive.xml')
+        open(f,'w').close()
+        self.assertTrue(archive_exists(n))
+        os.remove(f)
 
-        open('testarchive.json','w').close()
-        self.assertTrue(archive_exists('testarchive'))
-        os.remove('testarchive.json')
+        f = self.filename('testarchive.json')
+        open(f,'w').close()
+        self.assertTrue(archive_exists(n))
+        os.remove(f)
 
-        open('testarchive.xml','w').close()
-        open('testarchive.json','w').close()
-        self.assertTrue(archive_exists('testarchive'))
-        os.remove('testarchive.xml')
-        os.remove('testarchive.json')
+        f1 = self.filename('testarchive.xml')
+        f2 = self.filename('testarchive.json')
+        open(f1,'w').close()
+        open(f2,'w').close()
+        self.assertTrue(archive_exists(n))
+        os.remove(f1)
+        os.remove(f2)
 
     def test_save_to_xml_and_json(self):
-        f1 = 'testarchive1.xml'
-        f1_ref = 'testarchive1_reference.xml'
-        f2 = 'testarchive2.json'
-        f2_ref = 'testarchive2_reference.json'
+        f1 = self.filename('testarchive1.xml')
+        f1_ref = self.filename('testarchive1_reference.xml')
+        f2 = self.filename('testarchive2.json')
+        f2_ref = self.filename('testarchive2_reference.json')
         f = open(f1_ref, 'w')
         f.write(test_xml['list'])
         f.close()
@@ -721,9 +847,9 @@ class TestArchive(unittest.TestCase):
         f.write(test_json['list'])
         f.close()
         
-        a = Archive('testarchive1', 'measurement', indent=8, default_format='xml')
+        a = Archive(self.filename('testarchive1'), 'measurement', indent=8, default_format='xml')
         a.save(test_data['list'])
-        a = Archive('testarchive2', 'measurement', indent=8, default_format='json')
+        a = Archive(self.filename('testarchive2'), 'measurement', indent=8, default_format='json')
         a.save(test_data['list'])
 
         self.assertTrue(os.path.exists(f1))
@@ -732,12 +858,9 @@ class TestArchive(unittest.TestCase):
         self.assertTrue(filecmp.cmp(f1, f1_ref, shallow=False))
         self.assertTrue(filecmp.cmp(f2, f2_ref, shallow=False))
 
-        for f in [f1,f2,f1_ref,f2_ref]:
-            os.remove(f)
-
     def test_load_from_xml_and_json(self):
-        f1 = 'testarchive1.xml'
-        f2 = 'testarchive2.json'
+        f1 = self.filename('testarchive1.xml')
+        f2 = self.filename('testarchive2.json')
         f = open(f1, 'w')
         f.write(test_xml['simple'])
         f.close()
@@ -745,45 +868,57 @@ class TestArchive(unittest.TestCase):
         f.write(test_json['simple'])
         f.close()
 
-        a = Archive('testarchive1', 'measurement')
+        a = Archive(self.filename('testarchive1'), 'measurement')
         o1 = a.load()
-        a = Archive('testarchive2', 'measurement')
+        a = Archive(self.filename('testarchive2'), 'measurement')
         o2 = a.load()
 
         self.assertEqual(o1, test_data['simple'])
         self.assertEqual(o2, test_data['simple'])
 
-        for f in [f1,f2]:
-            os.remove(f)
+    def test_load_archive_with_full_filename(self):
+        f1 = self.filename('testarchive1.xml')
+        f2 = self.filename('testarchive1.json')
+        f = open(f1, 'w')
+        f.write(test_xml['simple'])
+        f.close()
+        f = open(f2, 'w')
+        f.write(test_json['list'])
+        f.close()
+
+        a = Archive(self.filename('testarchive1.xml'), 'measurement')
+        o1 = a.load()
+        a = Archive(self.filename('testarchive1.json'), 'measurement')
+        o2 = a.load()
+
+        self.assertEqual(o1, test_data['simple'])
+        self.assertEqual(o2, test_data['list'])
 
     def test_default_format_is_used_if_no_archive_file_exists(self):
-        a = Archive('testarchive', 'measurement', default_format='xml')
+        a = Archive(self.filename('testarchive'), 'measurement', default_format='xml')
         a.save(test_data['simple'])
-        self.assertTrue(os.path.exists('testarchive.xml'))
-        os.remove('testarchive.xml')
+        self.assertTrue(os.path.exists(self.filename('testarchive.xml')))
 
     def test_default_format_is_overridden_by_exisiting_archive_file_format(self):
-        f = open('testarchive.json', 'w')
+        f = open(self.filename('testarchive.json'), 'w')
         f.write(test_json['simple'])
         f.close()
         
-        a = Archive('testarchive', 'measurement', default_format='xml')
+        a = Archive(self.filename('testarchive'), 'measurement', default_format='xml')
         a.save(test_data['list'])
         
-        self.assertTrue(os.path.exists('testarchive.json'))
-        self.assertFalse(os.path.exists('testarchive.xml'))
+        self.assertTrue(os.path.exists(self.filename('testarchive.json')))
+        self.assertFalse(os.path.exists(self.filename('testarchive.xml')))
 
-        a = Archive('testarchive', 'measurement', default_format='xml')
+        a = Archive(self.filename('testarchive'), 'measurement', default_format='xml')
         o = a.load()
 
         self.assertEqual(o, test_data['list'])
 
-        os.remove('testarchive.json')
-
     def test_save_archive_to_different_format(self):
-        f1 = 'testarchive1.xml'
-        f2 = 'testarchive1.json'
-        f2_ref = 'testarchive1_reference.json'
+        f1 = self.filename('testarchive1.xml')
+        f2 = self.filename('testarchive1.json')
+        f2_ref = self.filename('testarchive1_reference.json')
         f = open(f1, 'w')
         f.write(test_xml['simple'])
         f.close()
@@ -792,53 +927,75 @@ class TestArchive(unittest.TestCase):
         f.close()
 
         # Note: This should be mainly useful for format conversions.
-        a = Archive('testarchive1', 'measurement')
+        a = Archive(self.filename('testarchive1'), 'measurement')
         a.save(a.load(), format='json')
         
         self.assertTrue(os.path.exists(f1))
         self.assertTrue(os.path.exists(f2))
 
         with self.assertRaises(ArchiveError):
-            a = Archive('testarchive1', 'measurement')
+            a = Archive(self.filename('testarchive1'), 'measurement')
 
         os.remove(f1)
-        a = Archive('testarchive1', 'measurement')
+        a = Archive(self.filename('testarchive1'), 'measurement')
         o = a.load()
 
         self.assertEqual(o, test_data['simple'])
         self.assertTrue(filecmp.cmp(f2, f2_ref, shallow=False))
-        
-        for f in [f2,f2_ref]:
-            os.remove(f)
 
     def test_save_archive_to_different_format_with_invalid_format_fails(self):
-        f1 = 'testarchive1.xml'
+        f1 = self.filename('testarchive1.xml')
         f = open(f1, 'w')
         f.write(test_xml['simple'])
         f.close()
 
-        a = Archive('testarchive1', 'measurement')
+        a = Archive(self.filename('testarchive1'), 'measurement')
         with self.assertRaises(ArchiveError):
             a.save(a.load(), format='invalid')
 
-        os.remove(f1)
-
-    def test_use_archive_with_config_object(self):
-        f1 = 'testarchive1.xml'
-        f1_ref = 'testarchive1_reference.xml'
+    def test_use_archive_with_config_object_1(self):
+        f1 = self.filename('testarchive1.xml')
+        f1_ref = self.filename('testarchive1_reference.xml')
         f = open(f1_ref, 'w')
         f.write(test_xml['list'])
         f.close()
         
         c = {'archive_default_format': 'xml'}
-        a = Archive('testarchive1', 'measurement', indent=8, config=c)
+        a = Archive(self.filename('testarchive1'), 'measurement', indent=8, config=c)
         a.save(test_data['list'])
         
         self.assertTrue(os.path.exists(f1))
         self.assertTrue(filecmp.cmp(f1, f1_ref, shallow=False))
 
-        for f in [f1,f1_ref]:
-            os.remove(f)
+    def test_use_archive_with_config_object_2(self):
+        f1 = self.filename('testarchive1.json')
+        f1_ref = self.filename('testarchive1_reference.json')
+        f = open(f1_ref, 'w')
+        f.write(test_json['no_pretty_printing'])
+        f.close()
+        
+        # arguments to constructor overwrite config options
+        c = {'archive_default_format': 'xml', 'archive_pretty_print': False}
+        a = Archive(self.filename('testarchive1'), 'measurement', default_format='json', indent=8, config=c)
+        a.save(test_data['simple'])
+        
+        self.assertTrue(os.path.exists(f1))
+        self.assertTrue(filecmp.cmp(f1, f1_ref, shallow=False))
+
+    def test_use_archive_with_config_object_3(self):
+        f1 = self.filename('testarchive1.json')
+        f1_ref = self.filename('testarchive1_reference.json')
+        f = open(f1_ref, 'w')
+        f.write(test_json['no_pretty_printing'])
+        f.close()
+        
+        # arguments to constructor overwrite config options
+        c = {'archive_default_format': 'xml', 'archive_pretty_print': True}
+        a = Archive(self.filename('testarchive1'), 'measurement', default_format='json', pretty_print=False, indent=8, config=c)
+        a.save(test_data['simple'])
+        
+        self.assertTrue(os.path.exists(f1))
+        self.assertTrue(filecmp.cmp(f1, f1_ref, shallow=False))
 
 class TestSerializer(unittest.TestCase):
     def test_serialize_an_object(self):

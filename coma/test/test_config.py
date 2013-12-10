@@ -19,6 +19,7 @@ experiment_index = ~/experiments.index
 measurement_file = ${measurement_id}
 measurement_index = measurements.index
 archive_default_format = xml
+archive_pretty_print = no
 '''
 
 class TestConfig(unittest.TestCase):
@@ -41,7 +42,7 @@ class TestConfig(unittest.TestCase):
         f = open('__pref.conf')
         ls = f.readlines()
         f.close()
-        self.assertEqual(len(ls), 8)
+        self.assertEqual(len(ls), 9)
 
         create_config_file('__pref.conf')
         # should print a message
@@ -62,12 +63,13 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(c['experiment_index'], 'quark')
 
         c = load_config('__pref2.conf')
-        self.assertEqual(len(c), 5)
+        self.assertEqual(len(c), 6)
         self.assertEqual(c['experiment_file'], 'experiment.readme')
         self.assertEqual(c['experiment_index'], '~/experiments.index')
         self.assertEqual(c['measurement_file'], '${measurement_id}')
         self.assertEqual(c['measurement_index'], 'measurements.index')
         self.assertEqual(c['archive_default_format'], 'xml')
+        self.assertEqual(c['archive_pretty_print'], False)
         
         os.remove('__pref1.conf')
         os.remove('__pref2.conf')
