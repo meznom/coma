@@ -815,16 +815,19 @@ class TestArchive(unittest.TestCase):
         f = self.filename('testarchive.txt')
         open(f,'w').close()
         self.assertFalse(archive_exists(n))
+        self.assertFalse(archive_exists(f))
         os.remove(f)
 
         f = self.filename('testarchive.xml')
         open(f,'w').close()
         self.assertTrue(archive_exists(n))
+        self.assertTrue(archive_exists(f))
         os.remove(f)
 
         f = self.filename('testarchive.json')
         open(f,'w').close()
         self.assertTrue(archive_exists(n))
+        self.assertTrue(archive_exists(f))
         os.remove(f)
 
         f1 = self.filename('testarchive.xml')
@@ -832,6 +835,8 @@ class TestArchive(unittest.TestCase):
         open(f1,'w').close()
         open(f2,'w').close()
         self.assertTrue(archive_exists(n))
+        self.assertTrue(archive_exists(f1))
+        self.assertTrue(archive_exists(f2))
         os.remove(f1)
         os.remove(f2)
 

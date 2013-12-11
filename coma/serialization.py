@@ -371,9 +371,11 @@ class Archive(object):
         else:
             return filename,self.default_format
 
-def archive_exists(basename):
+def archive_exists(filename):
     fs = []
     for f in Archive.formats:
-        if os.path.exists(basename + '.' + f):
+        if filename.endswith('.' + f) and os.path.exists(filename):
+            return True
+        if os.path.exists(filename + '.' + f):
             return True
     return False
