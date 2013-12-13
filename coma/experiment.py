@@ -379,8 +379,9 @@ class Experiment(object):
                 for name,path in tdef.iteritems():
                     v = m[path]
                     if isinstance(v,list):
-                        t.extend(v)
-                        c.extend([name + '_' + str(i+1) for i in range(len(v))])
+                        ns,vs = self._flatten_list(name,v)
+                        t.extend(vs)
+                        c.extend(ns)
                     else:
                         t.append(v)
                         c.append(name)
@@ -405,6 +406,21 @@ class Experiment(object):
             r.measurement_ids = ids
             rs.append(r)
         return rs
+
+    def _flatten_list(self, n, l):
+        """Flattens the list, returning a list of names and a list of values."""
+        ns = []
+        vs = []
+        for i,v in enumerate(l):
+            nn = n + '_' + str(i+1)
+            if isinstance(v,list):
+                ns_,vs_ = self._flatten_list(nn,v)
+                ns.extend(ns_)
+                vs.extend(vs_)
+            else:
+                ns.append(nn)
+                vs.append(v)
+        return ns,vs
 
     def _get_existing_psets(self):
         ps = []

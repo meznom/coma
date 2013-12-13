@@ -1416,6 +1416,7 @@ class TestExperiment(object):
                 s.results['P'] = [s.V1*10,s.V1*20,s.V1*30,s.V1*40]
             s.results['N'] = OrderedDict()
             s.results['N']['all'] = s.t * 100
+            s.results['NestedList'] = [[1,2],[[3,4],[5,6]]]
 
             m.end()
             m.save(s)
@@ -1438,9 +1439,11 @@ class TestExperiment(object):
         e = Experiment(self.d, config=self.c)
         self.assertEqual(e.number_of_measurements(), 180)
 
-        d = OrderedDict((('V1','parameters/layout/V1'),('P','results/P')))
+        d = OrderedDict((('V1','parameters/layout/V1'),('P','results/P'),
+                         ('NL','results/NestedList'),('N','results/N')))
         rs = e.retrieve_results(
-                (('V1','parameters/layout/V1'),('P','results/P')),
+                (('V1','parameters/layout/V1'),('P','results/P'),
+                  ('NL','results/NestedList'),('N','results/N')),
                 (('t','parameters/t'),('N','parameters/layout/N')))
 
         #print(rs)
@@ -1455,19 +1458,32 @@ class TestExperiment(object):
         self.assertEqual(i,6)
 
         # Tests that differ, depending on the parameter set
+        common_cols = ('NL_1_1','NL_1_2','NL_2_1_1','NL_2_1_2','NL_2_2_1',
+                       'NL_2_2_2','N')
         for r in rs['N',2]:
-            self.assertEqual(r.table_columns, ('V1', 'P_1', 'P_2'))
-            self.assertEqual(r.table.shape, (30,3))
+            self.assertEqual(r.table_columns,
+                             ('V1', 'P_1', 'P_2') + common_cols)
+            self.assertEqual(r.table.shape, (30,10))
         for r in rs['N',3]:
-            self.assertEqual(r.table_columns, ('V1', 'P_1', 'P_2', 'P_3'))
-            self.assertEqual(r.table.shape, (30,4))
+            self.assertEqual(r.table_columns,
+                             ('V1', 'P_1', 'P_2', 'P_3') + common_cols)
+            self.assertEqual(r.table.shape, (30,11))
         for r in rs['N',4]:
-            self.assertEqual(r.table_columns, ('V1', 'P_1', 'P_2', 'P_3', 'P_4'))
-            self.assertEqual(r.table.shape, (30,5))
+            self.assertEqual(r.table_columns,
+                             ('V1', 'P_1', 'P_2', 'P_3', 'P_4') + common_cols)
+            self.assertEqual(r.table.shape, (30,12))
         
         r = rs[0]
         self.assertEqual(r.parameters.t, 1)
         self.assertEqual(r.parameters.N, 2)
+        self.assertEqual(r.table[0,3], 1)
+        self.assertEqual(r.table[0,4], 2)
+        self.assertEqual(r.table[0,5], 3)
+        self.assertEqual(r.table[0,6], 4)
+        self.assertEqual(r.table[0,7], 5)
+        self.assertEqual(r.table[0,8], 6)
+        self.assertTrue(isinstance(r.table[0,9], OrderedDict))
+        self.assertEqual(r.table[0,9]['all'], 100)
         # a is not directly accessible
         with self.assertRaises(AttributeError):
             r.parameters.a
