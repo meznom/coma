@@ -298,7 +298,8 @@ class Experiment(object):
 
     def new_measurement(self):
         if not self.isactive():
-            return None
+            raise ExperimentError('Cannot create a new measurement for an '
+                                  'inactive experiment.')
         mid = self.mindex.increment()
         f = self._measurement_filename(mid)
         f = os.path.join(self.dir, f)
@@ -349,15 +350,16 @@ class Experiment(object):
         self.psets.append(p)
 
     def run(self, run_measurement=None):
-        if run_measurement is None:
-            run_measurement = self.run_measurement
+        run_m = self.run_measurement
+        if run_measurement is not None:
+            run_m = lambda p: run_measurement(self, p)
 
         existing = self._get_existing_psets()
         todo = [p for p in self.psets if p not in existing]
 
         self.start()
         for p in todo:
-            run_measurement(ParameterSet(self.pset_definition, p))
+            run_m(ParameterSet(self.pset_definition, p))
         self.end()
 
         return (len(todo),len(self.psets))

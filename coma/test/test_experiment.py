@@ -1160,15 +1160,7 @@ class TestExperiment(object):
             a = p.a.b
 
     def test_use_parameter_sets(self):
-        e = Experiment(self.d,config=self.c)
-        e.define_parameter_set(
-            ('t','parameters/t'),
-            ('V1','parameters/layout/V1'))
-        for t in [1,2]:
-            for V1 in range(100,200):
-                e.add_parameter_set(t,V1)
-
-        def run_measurement(p):
+        def run_measurement(e, p):
             m = e.new_measurement()
             m.start()
 
@@ -1180,6 +1172,14 @@ class TestExperiment(object):
 
             m.end()
             m.save(s)
+
+        e = Experiment(self.d,config=self.c)
+        e.define_parameter_set(
+            ('t','parameters/t'),
+            ('V1','parameters/layout/V1'))
+        for t in [1,2]:
+            for V1 in range(100,200):
+                e.add_parameter_set(t,V1)
 
         r,t = e.run(run_measurement)
 
@@ -1245,7 +1245,7 @@ class TestExperiment(object):
             for V1 in range(100,200):
                 e.add_parameter_set(t,V1)
 
-        def run_measurement(p):
+        def run_measurement(e, p):
             m = e.new_measurement()
             m.start()
 
@@ -1392,7 +1392,7 @@ class TestExperiment(object):
     def run_example_experiment_2(self):
         e = Experiment(self.d,config=self.c)
 
-        def run_measurement(p):
+        def run_measurement(e, p):
             m = e.new_measurement()
             m.start()
 
@@ -1548,7 +1548,7 @@ class TestExperiment(object):
     def run_example_experiment_3(self):
         e = Experiment(self.d,config=self.c)
 
-        def run_measurement(p):
+        def run_measurement(e, p):
             m = e.new_measurement()
             m.start()
 
@@ -1808,6 +1808,18 @@ class TestExperiment(object):
             self.assertEqual(m['parameters/a'], ns[i]-1)
             c += 1
         self.assertEqual(c,8)
+
+    def test_create_new_measurement_for_inactive_experiment_fails(self):
+        fn = self.filename('experiment.000030')
+        f = open(fn, 'w')
+        f.write(files[self.format][2])
+        f.close()
+
+        e = Experiment(self.d, config=self.c)
+        self.assertFalse(e.isactive())
+
+        with self.assertRaises(ExperimentError):
+            e.new_measurement()
 
     def test_load_config_from_default_configfile(self):
         # by default, if a file 'preferences.conf' exists in the current working
