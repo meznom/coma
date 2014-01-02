@@ -22,7 +22,7 @@ class ExampleSimulation(object):
     def run(self):
         pass
 
-    def coma_getstate(self):
+    def my_getstate(self):
         i = OrderedDict([
             ('parameters', OrderedDict([
                         ('a', self.a),
@@ -40,7 +40,7 @@ class TestFileMeasurement():
 
         self.c = {
             'archive_default_format': self.format,
-            'serializer_getstate': '__getstate__'
+            'serializer_getstate': 'my_getstate'
         }
         
         if os.path.exists(self.fn):

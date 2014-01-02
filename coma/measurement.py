@@ -57,10 +57,9 @@ class Measurement(object):
         s += '\n  Fields: {}\n'.format(self.data.keys())
         return s
 
-    # This is experimental, a convenience method for accessing the data
-    # dictionary like an object: E.g. m.data['parameters']['layout']['V1']
-    # should be accessible as m.parameters.layout.V1 (where m is an instance of
-    # Measurement)
+    # A convenience method for accessing the data dictionary like an object:
+    # E.g. m.data['parameters']['layout']['V1'] should be accessible as
+    # m.parameters.layout.V1 (where m is an instance of Measurement)
     def __getattr__(self, name):
         if not self.data.has_key(name):
             raise AttributeError()
@@ -81,6 +80,7 @@ class FileMeasurement(Measurement):
     def __init__(self, filename, id=None, config=None):
         Measurement.__init__(self)
         self.id = id
+        self.config = config
         self.archive = Archive(filename, 'measurement', config=config)
         if archive_exists(filename):
             self.load()
@@ -93,7 +93,7 @@ class FileMeasurement(Measurement):
 
     def save(self, m=None):
         if m is not None:
-            a = MemoryArchive()
+            a = MemoryArchive(config=self.config)
             o = a.serialize(m)
             i = OrderedDict()
             if hasattr(m, 'program'):
