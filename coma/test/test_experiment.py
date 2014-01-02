@@ -41,6 +41,8 @@ XML_FILE_2='''\
   <info>
     <experiment_id>20</experiment_id>
     <description>Miau</description>
+    <start_date>2013-12-31</start_date>
+    <end_date>2014-01-01</end_date>
   </info>
 </experiment>
 '''
@@ -50,7 +52,9 @@ JSON_FILE_2='''\
   "experiment": {
     "info": {
       "experiment_id": 20,
-      "description": "Miau"
+      "description": "Miau",
+      "start_date": "2013-12-31",
+      "end_date": "2014-01-01"
     }
   }
 }'''
@@ -64,8 +68,8 @@ XML_FILE_3='''\
       <count>0</count>
       <item_version>0</item_version>
     </tags>
-    <start_date/>
-    <end_date/>
+    <start_date>2010-01-01</start_date>
+    <end_date>2011-01-01</end_date>
   </info>
   <measurements>
     <count>10</count>
@@ -301,8 +305,8 @@ JSON_FILE_3='''\
       "experiment_id": 30,
       "description": "Test experiment",
       "tags": [],
-      "start_date": null,
-      "end_date": null
+      "start_date": "2010-01-01",
+      "end_date": "2011-01-01"
     },
     "measurements": [
       {
@@ -571,8 +575,8 @@ XML_FILE_5='''\
       <count>0</count>
       <item_version>0</item_version>
     </tags>
-    <start_date/>
-    <end_date/>
+    <start_date>2010-01-01</start_date>
+    <end_date>2011-01-01</end_date>
   </info>
 </experiment>
 '''
@@ -584,8 +588,8 @@ JSON_FILE_5='''\
       "experiment_id": 30,
       "description": "Test experiment",
       "tags": [],
-      "start_date": null,
-      "end_date": null
+      "start_date": "2010-01-01",
+      "end_date": "2011-01-01"
     }
   }
 }'''
@@ -661,6 +665,8 @@ class TestExperiment(object):
         self.assertTrue(self.exists('experiment.000003'))
         self.assertEquals(e.id, 3)
         self.assertEquals(e.description, 'Blub')
+        self.assertEquals(e.start_date, None)
+        self.assertEquals(e.end_date, None)
 
         # reopen the same experiment
         e = Experiment(self.d, config=self.c)
@@ -668,6 +674,8 @@ class TestExperiment(object):
         self.assertTrue(self.exists('experiment.000003'))
         self.assertEquals(e.id, 3)
         self.assertEquals(e.description, 'Blub')
+        self.assertEquals(e.start_date, None)
+        self.assertEquals(e.end_date, None)
 
     def test_create_experiment_without_id_in_name(self):
         c = copy.copy(self.c)
@@ -679,6 +687,8 @@ class TestExperiment(object):
         self.assertTrue(self.exists('experiment'))
         self.assertEquals(e.id, 3)
         self.assertEquals(e.description, 'Blub')
+        self.assertEquals(e.start_date, None)
+        self.assertEquals(e.end_date, None)
 
         # reopen the same experiment
         e = Experiment(self.d, config=c)
@@ -686,6 +696,8 @@ class TestExperiment(object):
         self.assertTrue(self.exists('experiment'))
         self.assertEquals(e.id, 3)
         self.assertEquals(e.description, 'Blub')
+        self.assertEquals(e.start_date, None)
+        self.assertEquals(e.end_date, None)
 
     def test_create_experiment_with_specific_id(self):
         # create a new experiment
@@ -694,6 +706,8 @@ class TestExperiment(object):
         self.assertTrue(self.exists('experiment.000042'))
         self.assertEquals(e.id, 42)
         self.assertEquals(e.description, 'Blub')
+        self.assertEquals(e.start_date, None)
+        self.assertEquals(e.end_date, None)
 
         # reopen the same experiment
         e = Experiment(self.d, config=self.c)
@@ -701,6 +715,8 @@ class TestExperiment(object):
         self.assertTrue(self.exists('experiment.000042'))
         self.assertEquals(e.id, 42)
         self.assertEquals(e.description, 'Blub')
+        self.assertEquals(e.start_date, None)
+        self.assertEquals(e.end_date, None)
 
     def test_create_experiment_without_index_file_1(self):
         c = copy.copy(self.c)
@@ -723,7 +739,7 @@ class TestExperiment(object):
         self.assertTrue(self.exists('experiment.000042'))
         self.assertEquals(e.id, 42)
 
-    def test_load_experiment_with_id(self):
+    def test_load_experiment_with_id_1(self):
         fn = self.filename('experiment.000010')
         f = open(fn, 'w')
         f.write(files[self.format][0])
@@ -732,6 +748,20 @@ class TestExperiment(object):
         e = Experiment(self.d, config=self.c)
         self.assertEquals(e.id, 10)
         self.assertEquals(e.description, 'Muh')
+        self.assertEquals(e.start_date, None)
+        self.assertEquals(e.end_date, None)
+
+    def test_load_experiment_with_id_2(self):
+        fn = self.filename('experiment.000020')
+        f = open(fn, 'w')
+        f.write(files[self.format][1])
+        f.close()
+
+        e = Experiment(self.d, config=self.c)
+        self.assertEquals(e.id, 20)
+        self.assertEquals(e.description, 'Miau')
+        self.assertEquals(e.start_date, '2013-12-31')
+        self.assertEquals(e.end_date, '2014-01-01')
 
     def test_load_experiment_without_id(self):
         c = copy.copy(self.c)
@@ -745,6 +775,8 @@ class TestExperiment(object):
         e = Experiment(self.d, config=c)
         self.assertEquals(e.id, 10)
         self.assertEquals(e.description, 'Muh')
+        self.assertEquals(e.start_date, None)
+        self.assertEquals(e.end_date, None)
 
     def test_load_experiment_with_wrong_id(self):
         fn = self.filename('experiment.000010')
@@ -786,6 +818,8 @@ class TestExperiment(object):
         e = Experiment(self.d, id=20, config=self.c)
         self.assertEquals(e.id, 20)
         self.assertEquals(e.description, 'Miau')
+        self.assertEquals(e.start_date, '2013-12-31')
+        self.assertEquals(e.end_date, '2014-01-01')
 
         with self.assertRaises(ExperimentError):
             e = Experiment(self.d, id=42, config=self.c)
@@ -804,6 +838,8 @@ class TestExperiment(object):
         e = Experiment(self.d,config=c)
         self.assertEquals(e.id, 10)
         self.assertEquals(e.description, 'Muh')
+        self.assertEquals(e.start_date, None)
+        self.assertEquals(e.end_date, None)
 
     def test_load_experiment_without_index_file_2(self):
         c = copy.copy(self.c)
@@ -818,6 +854,8 @@ class TestExperiment(object):
         e = Experiment(self.d,config=c)
         self.assertEquals(e.id, 10)
         self.assertEquals(e.description, 'Muh')
+        self.assertEquals(e.start_date, None)
+        self.assertEquals(e.end_date, None)
     
     def test_load_experiment_without_index_file_3(self):
         c = copy.copy(self.c)
@@ -831,6 +869,8 @@ class TestExperiment(object):
         e = Experiment(self.d,config=c)
         self.assertEquals(e.id, 10)
         self.assertEquals(e.description, 'Muh')
+        self.assertEquals(e.start_date, None)
+        self.assertEquals(e.end_date, None)
 
     def test_load_experiment_with_wrong_filename(self):
         c = copy.copy(self.c)
@@ -855,6 +895,8 @@ class TestExperiment(object):
         self.assertFalse(e.isactive())
         self.assertEquals(e.id, 30)
         self.assertEquals(e.description, 'Test experiment')
+        self.assertEquals(e.start_date, '2010-01-01')
+        self.assertEquals(e.end_date, '2011-01-01')
         self.assertEqual(e.number_of_measurements(), 10)
         for i,m in enumerate(e.measurements()):
             self.assertEqual(m['info/measurement_id'], i+1)
@@ -877,6 +919,8 @@ class TestExperiment(object):
         self.assertFalse(e.isactive())
         self.assertEquals(e.id, 30)
         self.assertEquals(e.description, 'Test experiment')
+        self.assertEquals(e.start_date, '2010-01-01')
+        self.assertEquals(e.end_date, '2011-01-01')
         self.assertEqual(e.number_of_measurements(), 10)
         for i,m in enumerate(e.measurements()):
             self.assertEqual(m['info/measurement_id'], i+1)
@@ -888,6 +932,7 @@ class TestExperiment(object):
 
     def run_example_experiment_1(self, e, r=(0,10)):
         s = ExampleSimulation()
+        e.start()
         for i in range(*r):
             m = e.new_measurement()
             s.a = i
@@ -895,6 +940,7 @@ class TestExperiment(object):
             s.run()
             s.results['E'] = i
             m.save(s)
+        e.end()
         e.save()
     
     def test_standalone_experiment(self):
@@ -911,6 +957,8 @@ class TestExperiment(object):
         e = Experiment(self.d,config=self.c)
         self.assertEqual(e.id, 3)
         self.assertEqual(e.description, 'Test experiment')
+        self.assertTrue(e.start_date is not None)
+        self.assertTrue(e.end_date is not None)
         self.assertEqual(e.number_of_measurements(), 10)
         for i,m in enumerate(e.measurements()):
             self.assertEqual(m['info/measurement_id'], i+1)
@@ -937,6 +985,8 @@ class TestExperiment(object):
         e = Experiment(self.d,config=c)
         self.assertEqual(e.id, None)
         self.assertEqual(e.description, 'Test experiment')
+        self.assertTrue(e.start_date is not None)
+        self.assertTrue(e.end_date is not None)
         self.assertEqual(e.number_of_measurements(), 10)
         for i,m in enumerate(e.measurements()):
             self.assertEqual(m['info/measurement_id'], i+1)
@@ -1437,6 +1487,8 @@ class TestExperiment(object):
         self.run_example_experiment_2()
 
         e = Experiment(self.d, config=self.c)
+        self.assertTrue(e.start_date is not None)
+        self.assertTrue(e.end_date is not None)
         self.assertEqual(e.number_of_measurements(), 180)
 
         d = OrderedDict((('V1','parameters/layout/V1'),('P','results/P'),
@@ -1498,6 +1550,8 @@ class TestExperiment(object):
         self.run_example_experiment_2()
 
         e = Experiment(self.d, config=self.c)
+        self.assertTrue(e.start_date is not None)
+        self.assertTrue(e.end_date is not None)
         self.assertEqual(e.number_of_measurements(), 180)
 
         tdef = [('V1','parameters/layout/V1'),
@@ -1534,6 +1588,8 @@ class TestExperiment(object):
         self.run_example_experiment_2()
 
         e = Experiment(self.d, config=self.c)
+        self.assertTrue(e.start_date is not None)
+        self.assertTrue(e.end_date is not None)
         self.assertEqual(e.number_of_measurements(), 180)
 
         # Tries to put different number of columns (for different N values)
@@ -1546,7 +1602,7 @@ class TestExperiment(object):
                                                 ('a','parameters/a')])
 
     def run_example_experiment_3(self):
-        e = Experiment(self.d,config=self.c)
+        e = Experiment(self.d, description='Example Experiment 3', config=self.c)
 
         def run_measurement(e, p):
             m = e.new_measurement()
@@ -1568,6 +1624,15 @@ class TestExperiment(object):
         for V1 in range(100,200):
             e.add_parameter_set(V1)
         r,t = e.run(run_measurement)
+
+    def test_start_and_end_date_get_saved_for_experiment(self):
+        self.run_example_experiment_3()
+        
+        e = Experiment(self.d, config=self.c)
+        self.assertEqual(e.description, 'Example Experiment 3')
+        self.assertTrue(e.start_date is not None)
+        self.assertTrue(e.end_date is not None)
+        self.assertEqual(e.number_of_measurements(), 100)
     
     def test_retrieve_results_for_a_simple_experiment(self):
         self.run_example_experiment_3()
@@ -1600,6 +1665,11 @@ class TestExperiment(object):
         
         e.description = 'Test experiment'
         self.run_example_experiment_1(e)
+        
+        # overwrite start_date and end_date for testing
+        e.start_date = '2010-01-01'
+        e.end_date = '2011-01-01'
+        e.save()
         
         self.assertTrue(e.isactive())
         self.assertEquals(e.number_of_measurements(), 10)

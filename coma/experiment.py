@@ -361,6 +361,7 @@ class Experiment(object):
         for p in todo:
             run_m(ParameterSet(self.pset_definition, p))
         self.end()
+        self.save()
 
         return (len(todo),len(self.psets))
 
