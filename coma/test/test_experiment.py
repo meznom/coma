@@ -8,6 +8,7 @@ import shutil
 import copy
 import glob
 import filecmp
+import pickle
 from coma import Experiment, ExperimentError, IndexFile, ParameterSet, \
                  ResultList, Result, Archive, expand_path, load_config
 
@@ -2052,3 +2053,11 @@ class TestExperimentXMLAndJsonMixed(unittest.TestCase):
             self.assertEqual(m['info/measurement_id'], i+1)
             self.assertEqual(m['info/program'], 'ExampleSimulation')
             self.assertEqual(m['parameters/a'], i)
+
+class TestParameterSet(unittest.TestCase):
+    def test_can_pickle_and_unpickle_parameter_set(self):
+        d1 = OrderedDict([('t','parameters/t'),('V1','parameters/layout/V1')])
+        p = ParameterSet(d1,[1,100])
+        s = pickle.dumps(p)
+        q = pickle.loads(s)
+        self.assertEqual(p.__dict__,q.__dict__)

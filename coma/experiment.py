@@ -77,9 +77,11 @@ class ParameterSet(object):
             raise ExperimentError('Parameter "{}" does not exist in this parameter set'.format(n))
 
     def __getattr__(self, n):
-        if not self.shortnames.has_key(n):
+        shortnames = object.__getattribute__(self, 'shortnames')
+        ps = object.__getattribute__(self, 'ps')
+        if not shortnames.has_key(n):
             raise AttributeError()
-        return self.ps[ self.shortnames[n] ]
+        return ps[ shortnames[n] ]
 
     def __getitem__(self, n):
         if isinstance(n, int):
