@@ -351,24 +351,24 @@ class Experiment(object):
         p = tuple(args)
         self.psets.append(p)
 
-    def run(self, run_measurement=None):
-        run_m = self.run_measurement
-        if run_measurement is not None:
-            run_m = lambda p: run_measurement(self, p)
-
+    def run(self, function=None):
         existing = self._get_existing_psets()
         todo = [p for p in self.psets if p not in existing]
 
         self.start()
         for p in todo:
-            run_m(ParameterSet(self.pset_definition, p))
+            self.run_measurement(function, ParameterSet(self.pset_definition, p))
         self.end()
         self.save()
 
         return (len(todo),len(self.psets))
 
-    def run_measurement(self, parameter_set):
-        raise NotImplementedError()
+    def run_measurement(self, function, parameter_set):
+        m = self.new_measurement()
+        m.start()
+        r = function(parameter_set)
+        m.end()
+        m.save(r)
 
     def retrieve_results(self, table_definition, parameter_set_definition=()):
         tdef = OrderedDict(table_definition)

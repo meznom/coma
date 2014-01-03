@@ -1211,18 +1211,13 @@ class TestExperiment(object):
             a = p.a.b
 
     def test_use_parameter_sets(self):
-        def run_measurement(e, p):
-            m = e.new_measurement()
-            m.start()
-
+        def run_measurement(p):
             s = ExampleSimulation()
             s.t = p.t
             s.V1 = p.V1
             s.init()
             s.run()
-
-            m.end()
-            m.save(s)
+            return s
 
         e = Experiment(self.d,config=self.c)
         e.define_parameter_set(
@@ -1257,7 +1252,7 @@ class TestExperiment(object):
                     for V1 in range(100,200):
                         self.add_parameter_set(t,V1)
 
-            def run_measurement(self, p):
+            def run_measurement(self, f, p):
                 m = self.new_measurement()
                 m.start()
 
@@ -1296,18 +1291,13 @@ class TestExperiment(object):
             for V1 in range(100,200):
                 e.add_parameter_set(t,V1)
 
-        def run_measurement(e, p):
-            m = e.new_measurement()
-            m.start()
-
+        def run_measurement(p):
             s = ExampleSimulation()
             s.t = p.t
             s.V1 = p.V1
             s.init()
             s.run()
-
-            m.end()
-            m.save(s)
+            return s
 
         r,t = e.run(run_measurement)
         self.assertEqual(r, 100)
@@ -1443,10 +1433,7 @@ class TestExperiment(object):
     def run_example_experiment_2(self):
         e = Experiment(self.d,config=self.c)
 
-        def run_measurement(e, p):
-            m = e.new_measurement()
-            m.start()
-
+        def run_measurement(p):
             s = ExampleSimulation()
             s.t = p.t
             s.V1 = p.V1
@@ -1468,9 +1455,7 @@ class TestExperiment(object):
             s.results['N'] = OrderedDict()
             s.results['N']['all'] = s.t * 100
             s.results['NestedList'] = [[1,2],[[3,4],[5,6]]]
-
-            m.end()
-            m.save(s)
+            return s
 
         e.define_parameter_set(
             ('t','parameters/t'),
@@ -1605,10 +1590,7 @@ class TestExperiment(object):
     def run_example_experiment_3(self):
         e = Experiment(self.d, description='Example Experiment 3', config=self.c)
 
-        def run_measurement(e, p):
-            m = e.new_measurement()
-            m.start()
-
+        def run_measurement(p):
             s = ExampleSimulation()
             s.V1 = p.V1
             s.init()
@@ -1617,9 +1599,7 @@ class TestExperiment(object):
             s.results['P'] = [s.V1*10,s.V1*20]
             s.results['N'] = OrderedDict()
             s.results['N']['all'] = s.t * 100
-
-            m.end()
-            m.save(s)
+            return s
 
         e.define_parameter_set((('V1','parameters/layout/V1')))
         for V1 in range(100,200):
