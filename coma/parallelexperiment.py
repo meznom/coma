@@ -33,6 +33,10 @@ class ParallelExperiment(Experiment):
         return (len(todo),len(self.psets))
 
     def run_measurement(self, function, parameter_set):
+        # Note: I pass a ParameterSet and this requires coma to be installed on
+        # the client / engine side as well (so that the unpickling works). I
+        # could avoid this dependency by using e.g. a dict instead of
+        # ParameterSet. But ParameterSet is a bit more convenient to use.
         m = self.new_measurement()
         m.start()
         ar = self.pview.apply(function, parameter_set)
