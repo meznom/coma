@@ -107,6 +107,6 @@ setup(name='coma',
       author_email='burkhard@ualberta.ca',
       license='BSD',
       url='https://bitbucket.org/meznom/coma',
-      packages=['coma'],
+      packages=['coma','coma.test'],
       cmdclass={'version': Version, 'sdist': sdist, 'install': install}
       )

@@ -16,4 +16,3 @@ from .serialization import XMLArchive, XMLArchiveError, JsonArchive, \
                            ArchiveError, archive_exists
 from .config import expand_path, load_config, create_config_file
 from .indexfile import IndexFile
-import test
