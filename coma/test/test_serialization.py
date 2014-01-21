@@ -1,14 +1,16 @@
-# Copyright (c) 2013, Burkhard Ritter
+# Copyright (c) 2013, 2014, Burkhard Ritter
 # This code is distributed under the two-clause BSD License.
 
 import unittest
 from collections import OrderedDict
 from coma import XMLArchive, XMLArchiveError, JsonArchive, JsonArchiveError, \
-                 Archive, ArchiveError, archive_exists, Serializer
+                 Archive, ArchiveError, archive_exists, Serializer, RecursiveSerializer
 import os
 import math
 import filecmp
 import shutil
+import numpy
+import copy
 
 _SIMPLE_XML='''\
 <measurement>
@@ -298,6 +300,87 @@ _NO_PRETTY_PRINTING_XML='<measurement><info><program>ExamplePythonSimulation</pr
 
 _NO_PRETTY_PRINTING_JSON='{"measurement":{"info":{"program":"ExamplePythonSimulation","version":"32ef404-dirty","measurement_id":3,"measurement_dir":"./000005","empty":null,"start_date":"2013-04-06T04:40:37Z","end_date":"2013-04-06T04:40:37Z"},"parameters":{"N":2,"m":{"N_row":3,"N_col":5}},"results":{"average":0.5}}}'
 
+_NUMPY_XML='''\
+<measurement>
+  <info>
+    <program>ExamplePythonSimulation</program>
+    <version>32ef404-dirty</version>
+    <measurement_id>3</measurement_id>
+    <measurement_dir>./000005</measurement_dir>
+    <empty/>
+    <start_date>2013-04-06T04:40:37Z</start_date>
+    <end_date>2013-04-06T04:40:37Z</end_date>
+  </info>
+  <parameters>
+    <N>2</N>
+    <m>
+      <N_row>3</N_row>
+      <N_col>5</N_col>
+    </m>
+  </parameters>
+  <results>
+    <numpy_array>
+      <__type__>numpy.ndarray</__type__>
+      <shape>
+        <count>2</count>
+        <item_version>0</item_version>
+        <item>2</item>
+        <item>3</item>
+      </shape>
+      <list>
+        <count>6</count>
+        <item_version>0</item_version>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+      </list>
+    </numpy_array>
+  </results>
+</measurement>
+'''
+
+_NUMPY_JSON='''\
+{
+  "measurement": {
+    "info": {
+      "program": "ExamplePythonSimulation",
+      "version": "32ef404-dirty",
+      "measurement_id": 3,
+      "measurement_dir": "./000005",
+      "empty": null,
+      "start_date": "2013-04-06T04:40:37Z",
+      "end_date": "2013-04-06T04:40:37Z"
+    },
+    "parameters": {
+      "N": 2,
+      "m": {
+        "N_row": 3,
+        "N_col": 5
+      }
+    },
+    "results": {
+      "numpy_array": {
+        "__type__": "numpy.ndarray",
+        "shape": [
+          2,
+          3
+        ],
+        "list": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      }
+    }
+  }
+}'''
+
 test_data = \
 {
     'simple': OrderedDict([
@@ -337,7 +420,25 @@ test_data = \
                 ('EmptyList', []),
                 ('ListWithDifferentTypes', [1,'text',3.1415]),
                 ]))
-            ])
+            ]),
+    'numpy': OrderedDict([
+            ('info', OrderedDict([
+                ('program', 'ExamplePythonSimulation'),
+                ('version', '32ef404-dirty'),
+                ('measurement_id', 3),
+                ('measurement_dir', './000005'),
+                ('empty', None),
+                ('start_date', '2013-04-06T04:40:37Z'),
+                ('end_date', '2013-04-06T04:40:37Z')
+                ])),
+            ('parameters', OrderedDict([
+                ('N', 2),
+                ('m', OrderedDict([('N_row', 3),('N_col', 5)]))
+                ])),
+            ('results', OrderedDict([
+                ('numpy_array', numpy.array([[1,2,3],[4,5,6]]))
+                ]))
+            ]),
 }
 
 test_xml = \
@@ -348,7 +449,8 @@ test_xml = \
     'invalid_list_1': _INVALID_LIST_1_XML,
     'invalid_list_2': _INVALID_LIST_2_XML,
     'hierarchy': _HIERARCHY_XML,
-    'no_pretty_printing': _NO_PRETTY_PRINTING_XML
+    'no_pretty_printing': _NO_PRETTY_PRINTING_XML,
+    'numpy': _NUMPY_XML
 }
 
 test_json = \
@@ -357,10 +459,10 @@ test_json = \
     'invalid_1': _INVALID_1_JSON,
     'list': _LIST_JSON,
     'hierarchy': _HIERARCHY_JSON,
-    'no_pretty_printing': _NO_PRETTY_PRINTING_JSON
+    'no_pretty_printing': _NO_PRETTY_PRINTING_JSON,
+    'numpy': _NUMPY_JSON
 }
 
-# TODO: Test MemoryArchive.
 # TODO: These tests could certainly be simplified. E.g. TestXMLArchive and
 # TestJsonArchive are mostly equivalent and even overlap with TestArchive.
 
@@ -466,6 +568,11 @@ class TestXMLArchive(unittest.TestCase):
         s = a.dumps(test_data['list'])
         self.assertEqual(test_xml['list'], s)
 
+    def test_dump_numpy(self):
+        a = XMLArchive('measurement')
+        s = a.dumps(test_data['numpy'])
+        self.assertEqual(test_xml['numpy'], s)
+
     def test_load_simple(self):
         with self.assertRaises(XMLArchiveError):
             a = XMLArchive('blah')
@@ -493,6 +600,16 @@ class TestXMLArchive(unittest.TestCase):
         a = XMLArchive('measurement')
         self.assertRaises(XMLArchiveError, a.loads, test_xml['invalid_list_1'])
         self.assertRaises(XMLArchiveError, a.loads, test_xml['invalid_list_2'])
+
+    def test_load_numpy(self):
+        a = XMLArchive('measurement')
+        d = a.loads(test_xml['numpy'])
+        d_ = copy.deepcopy(test_data['numpy'])
+        self.assertTrue((d_['results']['numpy_array'] == 
+                          d['results']['numpy_array']).all())
+        del d['results']['numpy_array']
+        del d_['results']['numpy_array']
+        self.assertEqual(d, d_)
 
     def test_roundtrip(self):
         a = XMLArchive('measurement')
@@ -638,6 +755,11 @@ class TestJsonArchive(unittest.TestCase):
         s = a.dumps(test_data['list'])
         self.assertEqual(test_json['list'], s)
 
+    def test_dump_numpy(self):
+        a = JsonArchive('measurement')
+        s = a.dumps(test_data['numpy'])
+        self.assertEqual(test_json['numpy'], s)
+
     def test_load_simple(self):
         with self.assertRaises(JsonArchiveError):
             a = JsonArchive('blah')
@@ -662,6 +784,16 @@ class TestJsonArchive(unittest.TestCase):
         a = JsonArchive('measurement')
         d = a.loads(test_json['list'])
         self.assertEqual(test_data['list'], d)
+
+    def test_load_numpy(self):
+        a = JsonArchive('measurement')
+        d = a.loads(test_json['numpy'])
+        d_ = copy.deepcopy(test_data['numpy'])
+        self.assertTrue((d_['results']['numpy_array'] == 
+                          d['results']['numpy_array']).all())
+        del d['results']['numpy_array']
+        del d_['results']['numpy_array']
+        self.assertEqual(d, d_)
 
     def test_roundtrip(self):
         a = JsonArchive('measurement')
@@ -1121,3 +1253,128 @@ class TestSerializer(unittest.TestCase):
         self.assertTrue(isinstance(o, Class2))
         self.assertEqual(o.c, 50)
         self.assertEqual(o.d, 90)
+
+    def test_serialize_numpy_arrays(self):
+        a = numpy.array([[1,2,3],[4,5,6]])
+        s = Serializer()
+        d = s.serialize(a)
+
+        self.assertTrue(d.has_key('__type__'))
+        self.assertTrue(d.has_key('shape'))
+        self.assertTrue(d.has_key('list'))
+        self.assertEquals(d['__type__'], 'numpy.ndarray')
+        self.assertEquals(d['shape'], (2,3))
+        self.assertEquals(d['list'], [1,2,3,4,5,6])
+
+    def test_restore_numpy_arrays(self):
+        d = OrderedDict([
+            ('__type__', 'numpy.ndarray'),
+            ('shape', [2,3]),
+            ('list', [1,2,3,4,5,6])
+        ])
+        s = Serializer()
+        o = s.restore(d)
+        self.assertTrue(isinstance(o, numpy.ndarray))
+        self.assertTrue((o == numpy.array([[1,2,3],[4,5,6]])).all())
+
+        with self.assertRaises(ValueError):
+            d = OrderedDict([
+                ('__type__', 'numpy.ndarray'),
+                ('shape', (2,3)),
+                ('list', [1,2,3,4,5])
+            ])
+            s = Serializer()
+            o = s.restore(d)
+
+class TestRecursiveSerializer(unittest.TestCase):
+    def setUp(self):
+        self.hierarchy = OrderedDict([
+            ('parameters', OrderedDict([
+                ('c',3),
+                ('d',4),
+                ('all', [3,4]),
+                ('object1', OrderedDict([
+                    ('parameters', OrderedDict([
+                        ('a',30),
+                        ('b',40),
+                        ('all', [30,40])
+                    ])),
+                    ('__class__', 'coma.test.test_serialization.Class1')
+                ]))
+            ])),
+            ('__class__', 'coma.test.test_serialization.Class2')
+        ])
+        self.d_numpy_array = OrderedDict([
+            ('__type__', 'numpy.ndarray'),
+            ('shape', [2,3]),
+            ('list', [1,2,3,4,5,6])
+        ])
+        self.numpy_array = numpy.array([[1,2,3],[4,5,6]])
+
+    def test_serialize_class_hierarchy(self):
+        o = Class2(3,4)
+        o.object1.a = 30
+        o.object1.b = 40
+
+        c = {'serializer_getstate': '__getstate__'}
+        a = RecursiveSerializer(config=c)
+        s = a.serialize(o)
+        self.assertEqual(s, self.hierarchy)
+
+    def test_restore_class_hierarchy_without_restoring_objects(self):
+        a = RecursiveSerializer()
+        o = a.restore(self.hierarchy)
+        self.assertEquals(o['parameters']['c'], 3)
+        self.assertEquals(o['parameters']['d'], 4)
+        self.assertEquals(o['parameters']['all'], [3,4])
+        self.assertEquals(o['parameters']['object1']['parameters']['a'], 30)
+        self.assertEquals(o['parameters']['object1']['parameters']['b'], 40)
+        self.assertEquals(o['parameters']['object1']['parameters']['all'], [30,40])
+
+    def test_restore_class_hierarchy_with_restoring_objects(self):
+        c = {
+            'serializer_getstate': '__getstate__',
+            'serializer_setstate': '__setstate__'
+        }
+        a = RecursiveSerializer(restore_objects=True, config=c)
+        o = a.restore(self.hierarchy)
+        self.assertTrue(isinstance(o,Class2))
+        self.assertEquals(o.c, 3)
+        self.assertEquals(o.d, 4)
+        self.assertTrue(isinstance(o.object1,Class1))
+        self.assertEquals(o.object1.a, 30)
+        self.assertEquals(o.object1.b, 40)
+
+    def test_serialize_numpy_arrays(self):
+        o = Class3(self.numpy_array,3)
+        s = RecursiveSerializer()
+        d = s.serialize(o)
+
+        self.assertTrue(d.has_key('parameters'));
+        self.assertTrue(d.has_key('__class__'));
+        self.assertEqual(d['__class__'], 'coma.test.test_serialization.Class3');
+        p = d['parameters']
+        self.assertTrue(p.has_key('a'));
+        self.assertTrue(p.has_key('b'));
+        self.assertTrue(p.has_key('all'));
+        self.assertEquals(p['all'][0], p['a'])
+        self.assertEqual(p['a'], self.d_numpy_array)
+
+    def test_restore_numpy_arrays(self):
+        d = OrderedDict([('parameters',OrderedDict([
+            ('a',self.d_numpy_array),
+            ('b',20)]))])
+        s = RecursiveSerializer()
+        o = s.restore(d)
+        self.assertTrue(o.has_key('parameters'))
+        self.assertTrue(o['parameters'].has_key('a'))
+        self.assertTrue(o['parameters'].has_key('b'))
+        self.assertTrue(isinstance(o['parameters']['a'],numpy.ndarray))
+        self.assertTrue((o['parameters']['a'] == self.numpy_array).all())
+
+        with self.assertRaises(ValueError):
+            r = self.d_numpy_array
+            r['list'] = r['list'][:-1]
+            d = OrderedDict([('parameters',OrderedDict([('a',r),('b',20)]))])
+            s = RecursiveSerializer()
+            o = s.restore(d)

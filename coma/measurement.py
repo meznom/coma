@@ -2,7 +2,7 @@
 # This code is distributed under the two-clause BSD License.
 
 from collections import OrderedDict
-from .serialization import Archive, MemoryArchive, archive_exists
+from .serialization import Archive, RecursiveSerializer, archive_exists
 from .path import access_data_by_path
 from .util import current_date_as_string
 
@@ -93,7 +93,7 @@ class FileMeasurement(Measurement):
 
     def save(self, m=None):
         if m is not None:
-            a = MemoryArchive(config=self.config)
+            a = RecursiveSerializer(config=self.config)
             o = a.serialize(m)
             i = OrderedDict()
             if hasattr(m, 'program'):

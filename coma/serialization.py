@@ -1,4 +1,4 @@
-# Copyright (c) 2013, Burkhard Ritter
+# Copyright (c) 2013, 2014, Burkhard Ritter
 # This code is distributed under the two-clause BSD License.
 
 from collections import OrderedDict
@@ -9,6 +9,7 @@ import re
 from importlib import import_module
 import math
 import os
+import numpy
 
 class Serializer(object):
     # TODO: '__class__' is part of the serialization / de-serialization
@@ -26,6 +27,10 @@ class Serializer(object):
                 self.setstate = config['serializer_setstate']
 
     def serialize(self, o):
+        # Special case for numpy array. In principle this could be a more
+        # general, extensible system to allow serialization of arbitrary types.
+        if isinstance(o, numpy.ndarray):
+            return self.serialize_numpy_ndarray(o)
         if not hasattr(o, self.getstate):
             raise AttributeError('Can\'t serialize ' + repr(o))
         f = getattr(o, self.getstate)
@@ -34,6 +39,9 @@ class Serializer(object):
         return d
 
     def restore(self, o):
+        if isinstance(o, dict) and '__type__' in o:
+            if o['__type__'] == 'numpy.ndarray':
+                return self.restore_numpy_ndarray(o)
         if not self.restore_objects:
             return o
         if not isinstance(o, dict) or not '__class__' in o:
@@ -54,22 +62,55 @@ class Serializer(object):
         f(i,o)
         return i
 
-class MemoryArchive(object):
-    def __init__(self, config=None):
-        self.serializer = Serializer(config=config)
+    def serialize_numpy_ndarray(self, o):
+        d = OrderedDict()
+        d['__type__'] = 'numpy.ndarray'
+        d['shape'] = o.shape
+        d['list'] = o.flatten().tolist()
+        return d
+
+    def restore_numpy_ndarray(self, d):
+        o = numpy.array(d['list'])
+        o.shape = d['shape']
+        return o
+
+# Maybe just merge this class with Serializer and have a flag recursive.
+# It might make sense to always use RecursiveSerializer for all serialization,
+# right now the same serialization functionality is implemented in different
+# ways in XMLArchive and JsonArchive.
+class RecursiveSerializer(object):
+    def __init__(self, restore_objects=False, getstate='coma_getstate', 
+                 setstate='coma_setstate', config=None):
+        self.serializer = Serializer(restore_objects=restore_objects,
+                                     getstate=getstate,
+                                     setstate=setstate,
+                                     config=config)
 
     def serialize(self, o):
-        return self.encode(o)
-
-    def encode(self, o):
         if isinstance(o, (basestring,bool,int,long,float)) or o is None:
             return o
         elif isinstance(o, (list, tuple)):
-            return [self.encode(i) for i in o]
+            return [self.serialize(i) for i in o]
         elif isinstance(o, dict):
-            return OrderedDict([(self.encode(k), self.encode(v)) for k,v in o.iteritems()])
+            return OrderedDict([(self.serialize(k), self.serialize(v)) for k,v in o.iteritems()])
         else:
-            return self.encode(self.serializer.serialize(o))
+            return self.serialize(self.serializer.serialize(o))
+
+    def restore(self, d):
+        o = None
+        if isinstance(d, (basestring,bool,int,long,float)) or d is None:
+            o = d
+        elif isinstance(d, dict):
+            o = OrderedDict()
+            for k,v in d.iteritems():
+                o[self.restore(k)] = self.restore(v)
+        elif isinstance(d, (list, tuple)):
+            o = []
+            for v in d:
+                o.append(self.restore(v))
+        else:
+            o = d
+        return self.serializer.restore(o)
 
 class XMLArchiveError(Exception):
     pass
