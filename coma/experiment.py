@@ -235,9 +235,14 @@ class Experiment(object):
         equal = True
         if self._number_of_file_measurements() != self._number_of_memory_measurements():
             equal = False
-        for m1,m2 in zip(self._file_measurements(), self._memory_measurements()):
-            if m1.data != m2.data:
-                equal = False
+        try:
+            for m1,m2 in zip(self._file_measurements(), self._memory_measurements()):
+                if m1.data != m2.data:
+                    equal = False
+        except ValueError:
+            print('Warning: Cannot garuantee that activation of experiment was '\
+                  'successful. This is a known issue if your data contains '\
+                  'numpy arrays.')
         if not equal:
             raise ExperimentError('Could not activate experiment. Leaving '
                                   'experiment in inconsistent state. Please '
@@ -261,9 +266,14 @@ class Experiment(object):
         equal = True
         if self._number_of_file_measurements() != self._number_of_memory_measurements():
             equal = False
-        for m1,m2 in zip(self._file_measurements(), self._memory_measurements()):
-            if m1.data != m2.data:
-                equal = False
+        try: 
+            for m1,m2 in zip(self._file_measurements(), self._memory_measurements()):
+                if m1.data != m2.data:
+                    equal = False
+        except ValueError:
+            print('Warning: Cannot garuantee that deactivation of experiment '\
+                  'was successful. This is a known issue if your data contains '\
+                  'numpy arrays.')
         if not equal:
             raise ExperimentError('Could not deactivate experiment. Leaving '
                                   'experiment in inconsistent state. Please '
