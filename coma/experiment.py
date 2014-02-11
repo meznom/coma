@@ -98,7 +98,31 @@ class ParameterSet(object):
         return s
 
 class Experiment(object):
+    """A "numerical" experiment."""
     def __init__(self, dir, id=None, description=None, tags=[], config=None):
+        """Load or create an experiment.
+
+        Load or create an experiment in directory `dir`. If the directory already
+        exists then the experiment is loaded, otherwise a new experiment with
+        identifier `id` is created. If no identifier is provided, but a global
+        experiment index exists (by default in
+        "~/.config/coma/experiment.index") then the global index is used to
+        assign a unique id. If no global index exists, then the id will simply
+        be None. 
+
+        When creating a new experiment, its description and tags can be set.
+
+        If `config` is None and a global config file exists (by default in
+        "~/.config/coma/preferences.conf") then the configuration from the
+        config file will be loaded. To overwrite the default config specify
+        a dictionary for `config` where the keys are the same as in the config
+        file. Note that always all config options are overwritten. To overwrite
+        only some config options but use defaults from the config file
+        otherwise use, for example: 
+        >>> c = coma.load_config()
+        >>> c['archive_default_format'] = 'xml'
+        >>> Experiment('example_dir', config=c)
+        """
         self.dir = dir
         self.id = id
         self.archive = None
@@ -355,13 +379,59 @@ class Experiment(object):
         return len(self._measurements)
 
     def define_parameter_set(self, *args):
+        """Define the parameters for this experiment, as a list of tuples.
+
+        Each parameter is described by a 2-tuple, where the first entry
+        is the short name of the parameter and the second entry is the
+        "path" of the parameter. Example:
+
+        >>> my_experiment.define_parameter_set(('N','parameters/N'),
+        >>>                                    ('P','parameters/P'))
+
+        The parameter path is used to find the parameter within a
+        measurement.  In the example above, 'P' would be stored as
+        m['parameters']['P'] where m is a measurement.
+
+        After defining the parameter set, use add_parameter_set to
+        actually add parameter sets.
+        """
         self.pset_definition = OrderedDict(args)
 
     def add_parameter_set(self, *args):
+        """Add a set of parameters for this experiment.
+
+        The parameter set must first be defined with
+        `define_parameter_set` and this definition is used to interpret
+        the supplied parameters. Example:
+
+        >>> my_experiment.define_parameter_set(('N','parameters/N'),
+        >>>                                    ('P','parameters/P'))
+        >>> my_experiment.add_parameter_set(4,1.2)
+        
+        This adds a parameter set with N=4 and P=1.2.
+
+        Each unique parameter set corresponds to one measurement.
+        Experiment.run will call a user-provided function for each
+        parameter set and store the results of this function as the
+        measurement.
+        """
         p = tuple(args)
         self.psets.append(p)
 
+    def clear_parameter_sets(self):
+        """Remove all previously added parameter sets."""
+        self.psets = []
+
     def run(self, function=None):
+        """Run `function` for each parameter set.
+
+        Runs `function` for all parameter sets that were not previously
+        computed and stores the results as measurements. The result of
+        `function` for each parameter set is stored as a separate measurement.
+
+        Returns the number of computed parameter sets and the total number of
+        parameter sets as a tuple.
+        """
         existing = self._get_existing_psets()
         todo = [p for p in self.psets if p not in existing]
 
