@@ -16,6 +16,15 @@ class ExperimentError(Exception):
     pass
 
 class Result(object):
+    """Retrieved result from an experiment.
+
+    A list of Result is returned by Experiment.retrieve_results. Result is a
+    simple object with the following properties:
+
+    table: Retrieved results table. A numpy array.
+    table_columns: Names of the columns of table. A list.
+    parameters: Parameters of this Result. A ParameterSet.
+    """
     def __init__(self):
         self.table = np.array([])
         self.table_definition = OrderedDict()
@@ -451,6 +460,31 @@ class Experiment(object):
         m.save(r)
 
     def retrieve_results(self, table_definition, parameter_set_definition=()):
+        """Retrieve results in table form, with one table per unique parameter set.
+
+        table_definition defines the columns of the table. It is a list of
+        (name,path) tuples where name chooses a name for the column and path
+        refers to the path of the retrieved quantity in the "tree" of the
+        measurement.
+
+        parameter_set_definition defines the parameter set and is optional. It
+        is a list of (name,path) tuples as well. For each unique parameter set
+        one result table is retrieved.
+
+        Returns a list of coma.Result.
+
+        Example:
+
+        >>> table_def = [('P','parameters/P'),('E','results/energy')]
+        >>> ps_def = [('N','parameters/N')]
+        >>> my_experiment.retrieve_results(table_def, ps_def)
+
+        This would retrieve a list of results where each coma.Result.table
+        would be a two column table (a numpy array) with columns P and E
+        (corresponding to m['parameters/P'] and m['results/energy'] where m is
+        a Measurement). If there were five different values for N, e.g.
+        N=1,2,3,4,5, it would return a list of five such coma.Results.
+        """
         tdef = OrderedDict(table_definition)
         pdef = OrderedDict(parameter_set_definition)
         

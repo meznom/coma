@@ -4,3 +4,4 @@ _version.py
 build
 dist
 MANIFEST
+.ipynb_checkpoints/
