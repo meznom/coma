@@ -3,7 +3,18 @@ import traceback
 from .experiment import Experiment, ParameterSet
 
 class ParallelExperiment(Experiment):
+    """An experiment that runs measurements in parallel.
+
+    Defined parameter sets---measurements---are run in parallel using
+    IPython.parallel's task interface (the LoadBalancedView).
+    """
     def __init__(self, *args, **kwargs):
+        """Load or create an experiment.
+
+        In addition to the Experiment's constructor's arguments, supports the
+        keyword argument `profile` to specify which IPython profile to use. The
+        default profile is "default".
+        """
         profile = 'default'
         if kwargs.has_key('profile'):
             profile = kwargs['profile']
