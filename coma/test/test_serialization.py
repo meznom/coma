@@ -338,6 +338,21 @@ _NUMPY_XML='''\
         <item>6</item>
       </list>
     </numpy_array>
+    <numpy_array_simple>
+      <__type__>numpy.ndarray</__type__>
+      <shape>
+        <count>1</count>
+        <item_version>0</item_version>
+        <item>3</item>
+      </shape>
+      <list>
+        <count>3</count>
+        <item_version>0</item_version>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+      </list>
+    </numpy_array_simple>
   </results>
 </measurement>
 '''
@@ -375,6 +390,17 @@ _NUMPY_JSON='''\
           4,
           5,
           6
+        ]
+      },
+      "numpy_array_simple": {
+        "__type__": "numpy.ndarray",
+        "shape": [
+          3
+        ],
+        "list": [
+          1,
+          2,
+          3
         ]
       }
     }
@@ -436,7 +462,8 @@ test_data = \
                 ('m', OrderedDict([('N_row', 3),('N_col', 5)]))
                 ])),
             ('results', OrderedDict([
-                ('numpy_array', numpy.array([[1,2,3],[4,5,6]]))
+                ('numpy_array', numpy.array([[1,2,3],[4,5,6]])),
+                ('numpy_array_simple', numpy.array([1,2,3]))
                 ]))
             ]),
 }
@@ -607,8 +634,12 @@ class TestXMLArchive(unittest.TestCase):
         d_ = copy.deepcopy(test_data['numpy'])
         self.assertTrue((d_['results']['numpy_array'] == 
                           d['results']['numpy_array']).all())
+        self.assertTrue((d_['results']['numpy_array_simple'] == 
+                          d['results']['numpy_array_simple']).all())
         del d['results']['numpy_array']
         del d_['results']['numpy_array']
+        del d['results']['numpy_array_simple']
+        del d_['results']['numpy_array_simple']
         self.assertEqual(d, d_)
 
     def test_roundtrip(self):
@@ -791,8 +822,12 @@ class TestJsonArchive(unittest.TestCase):
         d_ = copy.deepcopy(test_data['numpy'])
         self.assertTrue((d_['results']['numpy_array'] == 
                           d['results']['numpy_array']).all())
+        self.assertTrue((d_['results']['numpy_array_simple'] == 
+                          d['results']['numpy_array_simple']).all())
         del d['results']['numpy_array']
         del d_['results']['numpy_array']
+        del d['results']['numpy_array_simple']
+        del d_['results']['numpy_array_simple']
         self.assertEqual(d, d_)
 
     def test_roundtrip(self):
