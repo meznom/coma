@@ -13,7 +13,7 @@ library (version 2.x.x) which is different from and incompatible with [version
 
 For a more detailed explanation of what Coma is, the features it provides and
 what a typical workflow with Coma looks like, have a look at the documentation
-([Notebook viewer][notebook],[pdf][]).
+([Notebook viewer][notebook], [pdf][]).
 
 ## Installation
 
@@ -22,20 +22,20 @@ Python module, go to the Coma source directory and run the `setup.py` file.
     
     $ ./setup.py install
 
-Or to install it into your home directory.
+Or to install it into your home directory:
 
     $ ./setup.py install --user
 
 ## License
 
-Coma is distributed under the two-clause BSD license. Have a look at the file
-`LICENSE` for details.
+Coma is distributed under the two-clause BSD license. Have a look at the
+`LICENSE` file for details.
 
 ---
 
 Burkhard Ritter (<burkhard@seite9.de>), February 2014.
 
-[Coma]: https://bitbucket.org/meznom/coma
+[Coma]: https://github.com/meznom/coma
 [version 1]: https://bitbucket.org/cjchandler/coma-toolkit
-[notebook]: #
-[pdf]: #
+[notebook]: http://nbviewer.ipython.org/github/meznom/coma/blob/master/docs/introduction_to_coma.ipynb?create=1
+[pdf]: https://github.com/meznom/coma/raw/master/docs/introduction_to_coma.pdf
