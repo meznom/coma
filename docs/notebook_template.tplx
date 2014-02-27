@@ -1,0 +1,28 @@
+((============================================================================
+  A small custom NBConvert template.
+
+  Basically, all we do is ignore the h1 heading.
+  ==========================================================================))
+
+((*- extends 'sphinx.tplx' -*))
+
+((* set parentdocumentclass = 'article' *))
+((* set documentclass = 'howto' *))
+
+((* block headingcell -*))
+    ((*- if cell.level == 2 -*))
+        ((* block h2 -*))
+        \section((* endblock h2 -*))
+    ((*- elif cell.level == 3 -*))
+        ((* block h3 -*))\subsection((* endblock h3 -*))
+    ((*- elif cell.level == 4 -*))
+        ((* block h4 -*))\subsubsection((* endblock h4 -*))
+    ((*- elif cell.level == 5 -*))
+        ((* block h5 -*))\paragraph((* endblock h5 -*))
+    ((*- elif cell.level == 6 -*))
+        ((* block h6 -*))\subparagraph((* endblock h6 -*))
+    ((*- endif -*))
+    ((*- if cell.level != 1 -*))
+    {((( cell.source | replace('\n', ' ') | markdown2latex )))}
+    ((*- endif -*))
+((*- endblock headingcell *))
