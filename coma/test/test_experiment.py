@@ -91,6 +91,18 @@ XML_FILE_3='''\
           <boa>2.2</boa>
           <N/>
         </layout>
+        <tuple>
+          <count>3</count>
+          <item_version>0</item_version>
+          <item>
+            <count>2</count>
+            <item_version>0</item_version>
+            <item>1</item>
+            <item>2</item>
+          </item>
+          <item>3</item>
+          <item>4</item>
+        </tuple>
       </parameters>
       <results>
         <E>0</E>
@@ -113,6 +125,18 @@ XML_FILE_3='''\
           <boa>2.2</boa>
           <N/>
         </layout>
+        <tuple>
+          <count>3</count>
+          <item_version>0</item_version>
+          <item>
+            <count>2</count>
+            <item_version>0</item_version>
+            <item>1</item>
+            <item>2</item>
+          </item>
+          <item>3</item>
+          <item>4</item>
+        </tuple>
       </parameters>
       <results>
         <E>1</E>
@@ -135,6 +159,18 @@ XML_FILE_3='''\
           <boa>2.2</boa>
           <N/>
         </layout>
+        <tuple>
+          <count>3</count>
+          <item_version>0</item_version>
+          <item>
+            <count>2</count>
+            <item_version>0</item_version>
+            <item>1</item>
+            <item>2</item>
+          </item>
+          <item>3</item>
+          <item>4</item>
+        </tuple>
       </parameters>
       <results>
         <E>2</E>
@@ -157,6 +193,18 @@ XML_FILE_3='''\
           <boa>2.2</boa>
           <N/>
         </layout>
+        <tuple>
+          <count>3</count>
+          <item_version>0</item_version>
+          <item>
+            <count>2</count>
+            <item_version>0</item_version>
+            <item>1</item>
+            <item>2</item>
+          </item>
+          <item>3</item>
+          <item>4</item>
+        </tuple>
       </parameters>
       <results>
         <E>3</E>
@@ -179,6 +227,18 @@ XML_FILE_3='''\
           <boa>2.2</boa>
           <N/>
         </layout>
+        <tuple>
+          <count>3</count>
+          <item_version>0</item_version>
+          <item>
+            <count>2</count>
+            <item_version>0</item_version>
+            <item>1</item>
+            <item>2</item>
+          </item>
+          <item>3</item>
+          <item>4</item>
+        </tuple>
       </parameters>
       <results>
         <E>4</E>
@@ -201,6 +261,18 @@ XML_FILE_3='''\
           <boa>2.2</boa>
           <N/>
         </layout>
+        <tuple>
+          <count>3</count>
+          <item_version>0</item_version>
+          <item>
+            <count>2</count>
+            <item_version>0</item_version>
+            <item>1</item>
+            <item>2</item>
+          </item>
+          <item>3</item>
+          <item>4</item>
+        </tuple>
       </parameters>
       <results>
         <E>5</E>
@@ -223,6 +295,18 @@ XML_FILE_3='''\
           <boa>2.2</boa>
           <N/>
         </layout>
+        <tuple>
+          <count>3</count>
+          <item_version>0</item_version>
+          <item>
+            <count>2</count>
+            <item_version>0</item_version>
+            <item>1</item>
+            <item>2</item>
+          </item>
+          <item>3</item>
+          <item>4</item>
+        </tuple>
       </parameters>
       <results>
         <E>6</E>
@@ -245,6 +329,18 @@ XML_FILE_3='''\
           <boa>2.2</boa>
           <N/>
         </layout>
+        <tuple>
+          <count>3</count>
+          <item_version>0</item_version>
+          <item>
+            <count>2</count>
+            <item_version>0</item_version>
+            <item>1</item>
+            <item>2</item>
+          </item>
+          <item>3</item>
+          <item>4</item>
+        </tuple>
       </parameters>
       <results>
         <E>7</E>
@@ -267,6 +363,18 @@ XML_FILE_3='''\
           <boa>2.2</boa>
           <N/>
         </layout>
+        <tuple>
+          <count>3</count>
+          <item_version>0</item_version>
+          <item>
+            <count>2</count>
+            <item_version>0</item_version>
+            <item>1</item>
+            <item>2</item>
+          </item>
+          <item>3</item>
+          <item>4</item>
+        </tuple>
       </parameters>
       <results>
         <E>8</E>
@@ -289,6 +397,18 @@ XML_FILE_3='''\
           <boa>2.2</boa>
           <N/>
         </layout>
+        <tuple>
+          <count>3</count>
+          <item_version>0</item_version>
+          <item>
+            <count>2</count>
+            <item_version>0</item_version>
+            <item>1</item>
+            <item>2</item>
+          </item>
+          <item>3</item>
+          <item>4</item>
+        </tuple>
       </parameters>
       <results>
         <E>9</E>
@@ -325,7 +445,15 @@ JSON_FILE_3='''\
             "V1": 100,
             "boa": 2.2,
             "N": null
-          }
+          },
+          "tuple": [
+            [
+              1,
+              2
+            ],
+            3,
+            4
+          ]
         },
         "results": {
           "E": 0
@@ -347,7 +475,15 @@ JSON_FILE_3='''\
             "V1": 100,
             "boa": 2.2,
             "N": null
-          }
+          },
+          "tuple": [
+            [
+              1,
+              2
+            ],
+            3,
+            4
+          ]
         },
         "results": {
           "E": 1
@@ -369,7 +505,15 @@ JSON_FILE_3='''\
             "V1": 100,
             "boa": 2.2,
             "N": null
-          }
+          },
+          "tuple": [
+            [
+              1,
+              2
+            ],
+            3,
+            4
+          ]
         },
         "results": {
           "E": 2
@@ -391,7 +535,15 @@ JSON_FILE_3='''\
             "V1": 100,
             "boa": 2.2,
             "N": null
-          }
+          },
+          "tuple": [
+            [
+              1,
+              2
+            ],
+            3,
+            4
+          ]
         },
         "results": {
           "E": 3
@@ -413,7 +565,15 @@ JSON_FILE_3='''\
             "V1": 100,
             "boa": 2.2,
             "N": null
-          }
+          },
+          "tuple": [
+            [
+              1,
+              2
+            ],
+            3,
+            4
+          ]
         },
         "results": {
           "E": 4
@@ -435,7 +595,15 @@ JSON_FILE_3='''\
             "V1": 100,
             "boa": 2.2,
             "N": null
-          }
+          },
+          "tuple": [
+            [
+              1,
+              2
+            ],
+            3,
+            4
+          ]
         },
         "results": {
           "E": 5
@@ -457,7 +625,15 @@ JSON_FILE_3='''\
             "V1": 100,
             "boa": 2.2,
             "N": null
-          }
+          },
+          "tuple": [
+            [
+              1,
+              2
+            ],
+            3,
+            4
+          ]
         },
         "results": {
           "E": 6
@@ -479,7 +655,15 @@ JSON_FILE_3='''\
             "V1": 100,
             "boa": 2.2,
             "N": null
-          }
+          },
+          "tuple": [
+            [
+              1,
+              2
+            ],
+            3,
+            4
+          ]
         },
         "results": {
           "E": 7
@@ -501,7 +685,15 @@ JSON_FILE_3='''\
             "V1": 100,
             "boa": 2.2,
             "N": null
-          }
+          },
+          "tuple": [
+            [
+              1,
+              2
+            ],
+            3,
+            4
+          ]
         },
         "results": {
           "E": 8
@@ -523,7 +715,15 @@ JSON_FILE_3='''\
             "V1": 100,
             "boa": 2.2,
             "N": null
-          }
+          },
+          "tuple": [
+            [
+              1,
+              2
+            ],
+            3,
+            4
+          ]
         },
         "results": {
           "E": 9
@@ -627,6 +827,7 @@ class ExampleSimulation(object):
         i['parameters']['layout']['V1'] = self.V1
         i['parameters']['layout']['boa'] = self.boa
         i['parameters']['layout']['N'] = self.N
+        i['parameters']['tuple'] = ((1,2),3,4)
         i['results'] = self.results
         return i
 
@@ -1531,6 +1732,25 @@ class TestExperiment(object):
             self.assertEqual(id,i+1)
             self.assertEqual(r.table[i,0], 100+i%10)
             self.assertEqual(r.table[i,1], (100+i%10)*10)
+
+    def test_retrieve_results_with_tuple_as_parameter(self):
+        self.run_example_experiment_2()
+        e = Experiment(self.d, config=self.c)
+        rs = e.retrieve_results(
+                (
+                    ('V1','parameters/layout/V1'),
+                    ('P','results/P'),
+                    ('NL','results/NestedList'),
+                    ('N','results/N')
+                ),
+                (
+                    ('t','parameters/t'),
+                    ('N','parameters/layout/N'),
+                    ('tuple','parameters/tuple')
+                )
+            )
+        for r in rs:
+            self.assertEqual(r.parameters.tuple,((1,2),3,4))
 
     def test_retrieve_results_with_only_some_measurements_matching(self):
         self.run_example_experiment_2()

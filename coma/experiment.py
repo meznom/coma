@@ -494,7 +494,7 @@ class Experiment(object):
                 p,t,c = [],[],[]
                 for name,path in pdef.iteritems():
                     p.append(m[path])
-                p = tuple(p)
+                p = self._tuplify(p)
                 for name,path in tdef.iteritems():
                     v = m[path]
                     if isinstance(v,list):
@@ -525,6 +525,16 @@ class Experiment(object):
             r.measurement_ids = ids
             rs.append(r)
         return rs
+
+    def _tuplify(self, l):
+        """Recursively converts all lists in l into tuples."""
+        if isinstance(l,list):
+            vs = []
+            for v in l:
+                vs.append(self._tuplify(v))
+            return tuple(vs)
+        else:
+            return l
 
     def _flatten_list(self, n, l):
         """Flattens the list, returning a list of names and a list of values."""
