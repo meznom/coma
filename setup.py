@@ -4,8 +4,6 @@
 # https://github.com/warner/python-ecdsa.
 import os, sys, subprocess, re
 from distutils.core import setup, Command, Extension
-from distutils.command.sdist import sdist as _sdist
-from distutils.command.install import install as _install
 
 VERSION_PY_FILENAME = 'coma/_version.py'
 VERSION_PY = """\
@@ -77,29 +75,6 @@ class Version(Command):
         update_version_py()
         print 'Version is now', get_version()
 
-class sdist(_sdist):
-    def run(self):
-        update_version_py()
-        # unless we update this, the sdist command will keep using the old
-        # version
-        self.distribution.metadata.version = get_version()
-        return _sdist.run(self)
-    
-class install(_install):
-    def run(self):
-        update_version_py()
-        # unless we update this, the sdist command will keep using the old
-        # version
-        self.distribution.metadata.version = get_version()
-        r = _install.run(self)
-        
-        # Check if the bin directory is in the user's path
-        script_dir = self.install_scripts
-        ps = os.environ['PATH'].split(':')
-        if not (script_dir in ps or script_dir + '/' in ps):
-            print(NOT_IN_PATH_MESSAGE.format(script_dir,script_dir))
-        return r
-
 setup(name='coma',
       version=get_version(),
       description='The computational condensed matter physics programming toolkit.',
@@ -108,5 +83,5 @@ setup(name='coma',
       license='BSD',
       url='https://bitbucket.org/meznom/coma',
       packages=['coma','coma.test'],
-      cmdclass={'version': Version, 'sdist': sdist, 'install': install}
+      cmdclass={'version': Version}
       )

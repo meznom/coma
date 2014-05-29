@@ -1,6 +1,5 @@
 *.pyc
 *.swp
-_version.py
 build
 dist
 MANIFEST
